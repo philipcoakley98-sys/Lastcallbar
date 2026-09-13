@@ -1,7 +1,6 @@
 /* LAST CALL visual polish — shared imagery and compact editorial treatment */
 :root{--lc-gold:#d7b65d;--lc-cream:#f4eddf;--lc-green:#205b37}
-
-/* Main stories categories and world tiles: every tab gets a real visual. */
+html,body{overflow-x:hidden}
 .cat{position:relative;overflow:hidden;background-size:cover;background-position:center}
 .cat::before,.place::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(7,7,6,.18),rgba(7,7,6,.88));pointer-events:none}
 .cat>* ,.place>*{position:relative;z-index:1}
@@ -15,15 +14,11 @@
 .place:nth-child(3){background-image:url('https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?auto=format&fit=crop&q=78&w=700')}
 .place:nth-child(4){background-image:url('https://images.unsplash.com/photo-1523059623039-a9ed027e7fad?auto=format&fit=crop&q=78&w=700')}
 .place:nth-child(5){background-image:url('https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&q=78&w=700')}
-
-/* Compact visual headers for community and messaging. */
 .hero{position:relative;overflow:hidden;background-image:linear-gradient(90deg,rgba(7,7,6,.9),rgba(7,7,6,.45)),url('https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&q=78&w=1600');background-size:cover;background-position:center}
 .hero>*{position:relative;z-index:1}
 .people-head{position:relative;overflow:hidden;background-image:linear-gradient(90deg,rgba(7,7,6,.9),rgba(7,7,6,.5)),url('https://images.unsplash.com/photo-1572116469696-31de0f17cc34?auto=format&fit=crop&q=78&w=900');background-size:cover;background-position:center}
 .chathead{position:relative;overflow:hidden;background-image:linear-gradient(90deg,rgba(7,7,6,.9),rgba(7,7,6,.55)),url('https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&q=78&w=1100');background-size:cover;background-position:center}
 .avatar{background-image:linear-gradient(rgba(7,7,6,.2),rgba(7,7,6,.62)),url('https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&q=72&w=160');background-size:cover;background-position:center;color:transparent}
-
-/* Panels feel like editorial story cards rather than blank dialogs. */
 #panel[data-panel]{background:rgba(7,7,6,.97)}
 #panel[data-panel] .panel-inner{position:relative;padding-top:190px}
 #panel[data-panel] .panel-inner::before{content:"";position:absolute;left:0;right:0;top:0;height:155px;background-size:cover;background-position:center;border-bottom:1px solid rgba(215,182,93,.28);box-shadow:0 14px 35px rgba(0,0,0,.35)}
@@ -34,13 +29,5 @@
 #panel[data-panel="search"] .panel-inner::before{background-image:linear-gradient(90deg,rgba(7,7,6,.55),rgba(7,7,6,.1)),url('https://images.unsplash.com/photo-1515169067868-5387ec356754?auto=format&fit=crop&q=82&w=1500')}
 #panel[data-panel="story"],#panel[data-panel="collection"]{background:rgba(7,7,6,.97)}
 #panel[data-panel="story"] .panel-inner::before,#panel[data-panel="collection"] .panel-inner::before{background-image:linear-gradient(90deg,rgba(7,7,6,.55),rgba(7,7,6,.1)),url('https://images.unsplash.com/photo-1544148103-0773bf10d330?auto=format&fit=crop&q=82&w=1500')}
-
-@media(max-width:800px){
-  #panel[data-panel] .panel-inner{padding-top:145px}
-  #panel[data-panel] .panel-inner::before{height:115px}
-  .cat:nth-child(n),.place:nth-child(n){background-position:center}
-}
-@media(max-width:700px){
-  .hero{background-position:center 45%}
-  .people-head,.chathead{background-position:center}
-}
+@media(max-width:800px){#panel[data-panel] .panel-inner{padding-top:145px}#panel[data-panel] .panel-inner::before{height:115px}.cat:nth-child(n),.place:nth-child(n){background-position:center}}
+@media(max-width:700px){.hero{background-position:center 45%}.people-head,.chathead{background-position:center}}
