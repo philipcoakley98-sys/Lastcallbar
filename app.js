@@ -2,8 +2,9 @@
   const SUPABASE_URL='https://ccqyreaanjhfhglmmgkn.supabase.co';
   const SUPABASE_KEY='sb_publishable_LHWzWXPoDCD0VBl1i6QeBg_uFXrS_yL';
   let sb=null;
-  function init(){if(!(window.supabase&&window.supabase.createClient)){setTimeout(init,100);return;}sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);window.LASTCALL={sb};if(location.hash==='#stories')loadLiveStories();}
-  function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+  function init(){if(!(window.supabase&&window.supabase.createClient)){setTimeout(init,100);return;}sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);window.LASTCALL={sb};fixHeroCTA();if(location.hash==='#stories')loadLiveStories();}
+  function fixHeroCTA(){const c=document.querySelector('.stories-hero .explore');if(c){c.textContent='WRITE A STORY →';c.onclick=()=>openPanel('write');c.setAttribute('aria-label','Write a story');}}
+  function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;').replace(/'/g,'&#39;')}
   function close(){document.getElementById('panel')?.classList.add('hidden')} window.closePanel=close;
   function show(html){const p=document.getElementById('panel'),c=document.getElementById('panelContent');if(!p||!c)return;c.innerHTML=html;p.classList.remove('hidden')}
   async function session(){if(!sb)return null;return (await sb.auth.getSession()).data.session}
