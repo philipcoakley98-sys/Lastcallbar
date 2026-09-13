@@ -3,8 +3,8 @@
 
 /* Main stories categories and world tiles: every tab gets a real visual. */
 .cat{position:relative;overflow:hidden;background-size:cover;background-position:center}
-.cat::before,.place::before,.card::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(7,7,6,.18),rgba(7,7,6,.88));pointer-events:none}
-.cat>* ,.place>* ,.card>*{position:relative;z-index:1}
+.cat::before,.place::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(7,7,6,.18),rgba(7,7,6,.88));pointer-events:none}
+.cat>* ,.place>*{position:relative;z-index:1}
 .cat:nth-child(1){background-image:url('https://images.unsplash.com/photo-1515003197210-e0cd71810b5f?auto=format&fit=crop&q=78&w=700')}
 .cat:nth-child(2){background-image:url('https://images.unsplash.com/photo-1519671282429-b44660ead0a7?auto=format&fit=crop&q=78&w=700')}
 .cat:nth-child(3){background-image:url('https://images.unsplash.com/photo-1527761939622-933c0a2a6a57?auto=format&fit=crop&q=78&w=700')}
