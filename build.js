@@ -3,7 +3,9 @@ const files=['index.html','community.html','messenger.html'];
 for(const file of files){
   let html=fs.readFileSync(file,'utf8');
   if(file==='index.html' && !html.includes('id="last-call-live"')){
-    html=html.replace('</body>','<script id="last-call-live" src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="app.js"></script></body>');
+    html=html.replace('</body>','<script id="last-call-live" src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="app.js"></script><script src="auth-fix.js"></script></body>');
+  } else if(file==='index.html' && !html.includes('auth-fix.js')){
+    html=html.replace('<script src="app.js"></script>','<script src="app.js"></script><script src="auth-fix.js"></script>');
   }
   if(file==='index.html' && !html.includes('header-fix.css')){
     html=html.replace('</head>','<link rel="stylesheet" href="header-fix.css"></head>');
