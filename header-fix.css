@@ -1,0 +1,15 @@
+/* LAST CALL mobile header: keep the centered wordmark clear of the navigation. */
+@media (max-width:800px){
+  .landing-nav{position:absolute;display:grid;grid-template-columns:42px 1fr auto;align-items:center;height:58px;padding:0 14px;gap:8px}
+  .landing-brand{position:static;transform:none;justify-self:center;font-size:17px;letter-spacing:2.5px;white-space:nowrap}
+  .landing-links{margin:0;justify-self:end;display:flex;align-items:center;gap:10px;max-width:180px;font-size:7px;letter-spacing:.7px}
+  .landing-links a{white-space:nowrap}
+  .landing-links .search{font-size:16px;margin-left:1px}
+  .hamburger{display:block;width:30px;line-height:1}
+}
+@media (max-width:380px){
+  .landing-nav{grid-template-columns:34px 1fr auto;padding:0 10px;gap:5px}
+  .landing-brand{font-size:15px;letter-spacing:2px}
+  .landing-links{gap:7px;font-size:6px;max-width:155px}
+  .landing-links .search{font-size:14px}
+}
