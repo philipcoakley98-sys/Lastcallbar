@@ -1,10 +1,10 @@
-# LAST CALL — iPhone app starter
+# LAST CALL — native iPhone app
 
-This folder is the native SwiftUI starting point for LAST CALL.
+This folder contains the native SwiftUI iPhone app for LAST CALL.
 
 ## Visual direction
 
-The first build follows the approved starter mockup:
+The build follows the approved starter mockup:
 
 - dark Irish-pub editorial look
 - cream typography with gold accents and deep green actions
@@ -15,10 +15,24 @@ The first build follows the approved starter mockup:
 - welcoming, anonymous-friendly story submission
 - no payments, tipping or subscription language
 
+## Live backend integration
+
+The native app now connects to the existing LAST CALL Supabase project using the publishable key only. It includes:
+
+- email/password sign in and free membership creation
+- Keychain-backed refresh-session persistence
+- published story loading with sample fallback when the database has no published stories yet
+- authenticated story submission to the moderation queue (`pending`)
+- persistent 🍺 reactions
+- community profile/follow loading and follow/unfollow
+- conversation loading, message requests, message sending and chat history
+- notifications with unread state and read marking
+- message privacy and blocking enforcement in the database
+
 ## Project
 
 Open `LastCall.xcodeproj` in Xcode and run the **LastCall** target on an iPhone simulator or device. Deployment target is iOS 17.
 
-The current source intentionally starts with local sample content so the interface can be built and tested independently. The next implementation step is wiring these screens to the existing LAST CALL Supabase backend for authentication, stories, reactions, follows, conversations, messages and notifications.
+The Linux environment used for repository work cannot run Xcode/iOS SDK builds, so final simulator/device compilation and TestFlight signing still need to be performed in Xcode on macOS.
 
-The web app remains at https://lastcallbar.co and will continue to use the same Supabase data model.
+The web app remains at https://lastcallbar.co and continues to use the same Supabase data model.
