@@ -121,7 +121,7 @@ struct NativeRootView: View {
     @EnvironmentObject private var model: NativeAppModel
     var body: some View {
         TabView(selection: $model.tab) {
-            NativeHome().tag(NativeTab.home)
+            LockedHome().tag(NativeTab.home)
             NativeDiscover().tag(NativeTab.discover)
             NativeWrite().tag(NativeTab.write)
             NativeMessages().tag(NativeTab.messages)
