@@ -55,23 +55,23 @@ final class LastCallAPI {
   }
   func fetchCommentCounts(storyIDs: [UUID], accessToken: String?) async throws -> [UUID: Int] {
     guard !storyIDs.isEmpty else { return [:] }
-    var c = URLComponents(
+    var components = URLComponents(
       url: baseURL.appendingPathComponent("rest/v1/comments"), resolvingAgainstBaseURL: false)!
-    c.queryItems = [
+    components.queryItems = [
       URLQueryItem(name: "select", value: "story_id"),
       URLQueryItem(
-        name: "story_id", value: "in.(\(storyIDs.map(\.uuidString).joined(separator:",")))"),
+        name: "story_id", value: "in.(\(storyIDs.map(\.uuidString).joined(separator: ",")))"),
       URLQueryItem(name: "limit", value: "1000"),
     ]
-    var r = URLRequest(url: c.url!)
-    r.setValue(publishableKey, forHTTPHeaderField: "apikey")
-    r.setValue("Bearer \(accessToken ?? publishableKey)", forHTTPHeaderField: "Authorization")
-    let (d, s) = try await URLSession.shared.data(for: r)
-    try validate(s, data: d)
-    let rows = try JSONDecoder.lastCall.decode([CommentCountRow].self, from: d)
-    return Dictionary(rows.map { ($0.storyId, 0) }) { a, _ in a }.merging(
-      rows.reduce(into: [UUID: Int]()) { $0[$1.storyId, default: 0]+ = 1 }
-    ) { _, new in new }
+    var request = URLRequest(url: components.url!)
+    request.setValue(publishableKey, forHTTPHeaderField: "apikey")
+    request.setValue("Bearer \(accessToken ?? publishableKey)", forHTTPHeaderField: "Authorization")
+    let (data, response) = try await URLSession.shared.data(for: request)
+    try validate(response, data: data)
+    let rows = try JSONDecoder.lastCall.decode([CommentCountRow].self, from: data)
+    return rows.reduce(into: [UUID: Int]()) { counts, row in
+      counts[row.storyId, default: 0] += 1
+    }
   }
   func toggleBeerReaction(storyID: UUID, userID: UUID, accessToken: String, reacted: Bool)
     async throws -> Bool
