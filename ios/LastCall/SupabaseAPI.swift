@@ -2,42 +2,681 @@ import Foundation
 import Security
 
 final class LastCallAPI {
-    static let shared=LastCallAPI(); private let baseURL=URL(string:"https://ccqyreaanjhfhglmmgkn.supabase.co")!; private let publishableKey="sb_publishable_LHWzWXPoDCD0VBl1i6QeBg_uFXrS_yL"; private let keychainService="com.lastcall.app.session"; private let keychainAccount="supabase"; private init(){}
-    private func request(path:String,method:String="GET",body:Data?=nil,accessToken:String?=nil)->URLRequest{var r=URLRequest(url:baseURL.appendingPathComponent(path));r.httpMethod=method;r.setValue(publishableKey,forHTTPHeaderField:"apikey");r.setValue("application/json",forHTTPHeaderField:"Accept");if let accessToken{r.setValue("Bearer \(accessToken)",forHTTPHeaderField:"Authorization")};if body != nil{r.setValue("application/json",forHTTPHeaderField:"Content-Type")};r.httpBody=body;return r}
-    func fetchPublishedStories()async throws->[RemoteStory]{var c=URLComponents(url:baseURL.appendingPathComponent("rest/v1/stories"),resolvingAgainstBaseURL:false)!;c.queryItems=[URLQueryItem(name:"select",value:"id,author_id,title,body,category,city,country,anonymous_name,image_url,created_at"),URLQueryItem(name:"status",value:"eq.published"),URLQueryItem(name:"order",value:"created_at.desc"),URLQueryItem(name:"limit",value:"30")];var r=URLRequest(url:c.url!);r.setValue(publishableKey,forHTTPHeaderField:"apikey");r.setValue("Bearer \(publishableKey)",forHTTPHeaderField:"Authorization");let(d,s)=try await URLSession.shared.data(for:r);try validate(s,data:d);return try JSONDecoder.lastCall.decode([RemoteStory].self,from:d)}
-    func fetchReactionStoryIDs(userID:UUID,accessToken:String)async throws->Set<UUID>{var c=URLComponents(url:baseURL.appendingPathComponent("rest/v1/reactions"),resolvingAgainstBaseURL:false)!;c.queryItems=[URLQueryItem(name:"select",value:"story_id"),URLQueryItem(name:"user_id",value:"eq.\(userID.uuidString)"),URLQueryItem(name:"kind",value:"eq.beer")];var r=URLRequest(url:c.url!);r.setValue(publishableKey,forHTTPHeaderField:"apikey");r.setValue("Bearer \(accessToken)",forHTTPHeaderField:"Authorization");let(d,s)=try await URLSession.shared.data(for:r);try validate(s,data:d);return Set(try JSONDecoder.lastCall.decode([ReactionRow].self,from:d).map(\.storyId))}
-    func fetchCommentCounts(storyIDs:[UUID],accessToken:String?)async throws->[UUID:Int]{guard !storyIDs.isEmpty else{return [:]};var c=URLComponents(url:baseURL.appendingPathComponent("rest/v1/comments"),resolvingAgainstBaseURL:false)!;c.queryItems=[URLQueryItem(name:"select",value:"story_id"),URLQueryItem(name:"story_id",value:"in.(\(storyIDs.map(\.uuidString).joined(separator:",")))"),URLQueryItem(name:"limit",value:"1000")];var r=URLRequest(url:c.url!);r.setValue(publishableKey,forHTTPHeaderField:"apikey");r.setValue("Bearer \(accessToken ?? publishableKey)",forHTTPHeaderField:"Authorization");let(d,s)=try await URLSession.shared.data(for:r);try validate(s,data:d);let rows=try JSONDecoder.lastCall.decode([CommentCountRow].self,from:d);return Dictionary(rows.map{($0.storyId,0)}){a,_ in a}.merging(rows.reduce(into:[UUID:Int]()){ $0[$1.storyId,default:0]+=1}){_,new in new}}
-    func toggleBeerReaction(storyID:UUID,userID:UUID,accessToken:String,reacted:Bool)async throws->Bool{var c=URLComponents(url:baseURL.appendingPathComponent("rest/v1/reactions"),resolvingAgainstBaseURL:false)!;c.queryItems=[URLQueryItem(name:"story_id",value:"eq.\(storyID.uuidString)"),URLQueryItem(name:"user_id",value:"eq.\(userID.uuidString)"),URLQueryItem(name:"kind",value:"eq.beer")];let r:URLRequest;if reacted{var x=URLRequest(url:c.url!);x.httpMethod="DELETE";x.setValue(publishableKey,forHTTPHeaderField:"apikey");x.setValue("Bearer \(accessToken)",forHTTPHeaderField:"Authorization");r=x}else{var x=request(path:"rest/v1/reactions",method:"POST",body:try JSONEncoder.lastCall.encode(ReactionInsert(storyId:storyID,userId:userID,kind:"beer")),accessToken:accessToken);x.setValue("return=minimal",forHTTPHeaderField:"Prefer");r=x};let(d,s)=try await URLSession.shared.data(for:r);try validate(s,data:d);return !reacted}
-    func signUp(email:String,password:String,displayName:String?)async throws->AuthResponse{let r=request(path:"auth/v1/signup",method:"POST",body:try JSONEncoder.lastCall.encode(AuthPayload(email:email,password:password,data:displayName.map{["display_name":$0]})));let(d,s)=try await URLSession.shared.data(for:r);try validate(s,data:d);let a=try JSONDecoder.lastCall.decode(AuthResponse.self,from:d);persist(a);return a}
-    func signIn(email:String,password:String)async throws->AuthResponse{let r=request(path:"auth/v1/token?grant_type=password",method:"POST",body:try JSONEncoder.lastCall.encode(AuthPayload(email:email,password:password,data:nil)));let(d,s)=try await URLSession.shared.data(for:r);try validate(s,data:d);let a=try JSONDecoder.lastCall.decode(AuthResponse.self,from:d);persist(a);return a}
-    func restoreSession()async->AuthResponse?{guard let refreshToken=keychainGet()else{return nil};do{let r=request(path:"auth/v1/token?grant_type=refresh_token",method:"POST",body:try JSONEncoder.lastCall.encode(RefreshPayload(refreshToken:refreshToken)));let(d,s)=try await URLSession.shared.data(for:r);try validate(s,data:d);let a=try JSONDecoder.lastCall.decode(AuthResponse.self,from:d);persist(a);return a}catch{clearSession();return nil}}
-    func signOut(){clearSession()}
-    func uploadStoryImage(jpeg:Data,userID:UUID,accessToken:String)async throws->URL{let name="\(UUID().uuidString).jpg";let url=baseURL.appendingPathComponent("storage/v1/object/story-media/\(userID.uuidString)/\(name)");var r=URLRequest(url:url);r.httpMethod="POST";r.httpBody=jpeg;r.setValue(publishableKey,forHTTPHeaderField:"apikey");r.setValue("Bearer \(accessToken)",forHTTPHeaderField:"Authorization");r.setValue("image/jpeg",forHTTPHeaderField:"Content-Type");r.setValue("false",forHTTPHeaderField:"x-upsert");let(d,s)=try await URLSession.shared.data(for:r);try validate(s,data:d);return baseURL.appendingPathComponent("storage/v1/object/public/story-media/\(userID.uuidString)/\(name)")}
-    func insertStory(title:String,body:String,category:String,city:String?,country:String?,anonymous:Bool,imageURL:URL?,accessToken:String,userID:UUID)async throws{let p=StoryInsert(authorId:userID,title:title.isEmpty ? "Untitled story":title,body:body,category:category,city:city?.nilIfEmpty,country:country?.nilIfEmpty,anonymousName:anonymous ? "Anonymous":nil,imageURL:imageURL?.absoluteString,status:"pending");var r=request(path:"rest/v1/stories",method:"POST",body:try JSONEncoder.lastCall.encode(p),accessToken:accessToken);r.setValue("return=minimal",forHTTPHeaderField:"Prefer");let(d,s)=try await URLSession.shared.data(for:r);try validate(s,data:d)}
-    private func profileSelect()->String{"id,display_name,username,bio,avatar_url,is_anonymous,privacy_followers,privacy_messages"}
-    func fetchProfile(userID:UUID,accessToken:String)async throws->ProfileRow?{var c=URLComponents(url:baseURL.appendingPathComponent("rest/v1/profiles"),resolvingAgainstBaseURL:false)!;c.queryItems=[URLQueryItem(name:"select",value:profileSelect()),URLQueryItem(name:"id",value:"eq.\(userID.uuidString)"),URLQueryItem(name:"limit",value:"1")];var r=URLRequest(url:c.url!);r.setValue(publishableKey,forHTTPHeaderField:"apikey");r.setValue("Bearer \(accessToken)",forHTTPHeaderField:"Authorization");let(d,s)=try await URLSession.shared.data(for:r);try validate(s,data:d);return try JSONDecoder.lastCall.decode([ProfileRow].self,from:d).first}
-    func fetchProfiles(excluding userID:UUID?,accessToken:String)async throws->[ProfileRow]{var c=URLComponents(url:baseURL.appendingPathComponent("rest/v1/profiles"),resolvingAgainstBaseURL:false)!;var q=[URLQueryItem(name:"select",value:profileSelect()),URLQueryItem(name:"order",value:"created_at.desc"),URLQueryItem(name:"limit",value:"40")];if let userID{q.append(URLQueryItem(name:"id",value:"neq.\(userID.uuidString)"))};c.queryItems=q;var r=URLRequest(url:c.url!);r.setValue(publishableKey,forHTTPHeaderField:"apikey");r.setValue("Bearer \(accessToken)",forHTTPHeaderField:"Authorization");let(d,s)=try await URLSession.shared.data(for:r);try validate(s,data:d);return try JSONDecoder.lastCall.decode([ProfileRow].self,from:d)}
-    func fetchProfiles(ids:[UUID],accessToken:String)async throws->[ProfileRow]{guard !ids.isEmpty else{return []};var c=URLComponents(url:baseURL.appendingPathComponent("rest/v1/profiles"),resolvingAgainstBaseURL:false)!;c.queryItems=[URLQueryItem(name:"select",value:profileSelect()),URLQueryItem(name:"id",value:"in.(\(ids.map(\.uuidString).joined(separator:",")))"),URLQueryItem(name:"limit",value:"40")];var r=URLRequest(url:c.url!);r.setValue(publishableKey,forHTTPHeaderField:"apikey");r.setValue("Bearer \(accessToken)",forHTTPHeaderField:"Authorization");let(d,s)=try await URLSession.shared.data(for:r);try validate(s,data:d);return try JSONDecoder.lastCall.decode([ProfileRow].self,from:d)}
-    func updateProfile(userID:UUID,displayName:String,username:String,bio:String,accessToken:String)async throws->ProfileRow?{var c=URLComponents(url:baseURL.appendingPathComponent("rest/v1/profiles"),resolvingAgainstBaseURL:false)!;c.queryItems=[URLQueryItem(name:"id",value:"eq.\(userID.uuidString)")];var r=request(path:"rest/v1/profiles",method:"PATCH",body:try JSONEncoder.lastCall.encode(ProfileUpdate(displayName:displayName.nilIfEmpty,username:username.nilIfEmpty,bio:bio.nilIfEmpty)),accessToken:accessToken);r.url=c.url!;r.setValue("return=representation",forHTTPHeaderField:"Prefer");let(d,s)=try await URLSession.shared.data(for:r);try validate(s,data:d);return try JSONDecoder.lastCall.decode([ProfileRow].self,from:d).first}
-    func fetchProfileStats(userID:UUID,accessToken:String)async throws->ProfileStats{let stories=try await fetchCount(path:"rest/v1/stories",filters:[("author_id","eq.\(userID.uuidString)"),("status","eq.published")],accessToken:accessToken);let followers=try await fetchCount(path:"rest/v1/follows",filters:[("following_id","eq.\(userID.uuidString)" )],accessToken:accessToken);let following=try await fetchCount(path:"rest/v1/follows",filters:[("follower_id","eq.\(userID.uuidString)")],accessToken:accessToken);return ProfileStats(stories:stories,followers:followers,following:following)}
-    private func fetchCount(path:String,filters:[(String,String)],accessToken:String)async throws->Int{var c=URLComponents(url:baseURL.appendingPathComponent(path),resolvingAgainstBaseURL:false)!;c.queryItems=[URLQueryItem(name:"select",value:"id")]+filters.map{URLQueryItem(name:$0.0,value:$0.1)};var r=URLRequest(url:c.url!);r.setValue(publishableKey,forHTTPHeaderField:"apikey");r.setValue("Bearer \(accessToken)",forHTTPHeaderField:"Authorization");r.setValue("count=exact",forHTTPHeaderField:"Prefer");r.setValue("0-0",forHTTPHeaderField:"Range");let(d,s)=try await URLSession.shared.data(for:r);try validate(s,data:d);if let h=(s as? HTTPURLResponse)?.value(forHTTPHeaderField:"Content-Range"),let n=Int(h.split(separator:"/").last ?? ""){return n};return (try? JSONDecoder.lastCall.decode([[String:UUID]].self,from:d).count) ?? 0}
-    func fetchFollowing(userID:UUID,accessToken:String)async throws->Set<UUID>{var c=URLComponents(url:baseURL.appendingPathComponent("rest/v1/follows"),resolvingAgainstBaseURL:false)!;c.queryItems=[URLQueryItem(name:"select",value:"following_id"),URLQueryItem(name:"follower_id",value:"eq.\(userID.uuidString)")];var r=URLRequest(url:c.url!);r.setValue(publishableKey,forHTTPHeaderField:"apikey");r.setValue("Bearer \(accessToken)",forHTTPHeaderField:"Authorization");let(d,s)=try await URLSession.shared.data(for:r);try validate(s,data:d);return Set(try JSONDecoder.lastCall.decode([FollowRow].self,from:d).map(\.followingId))}
-    func toggleFollow(targetID:UUID,userID:UUID,accessToken:String,following:Bool)async throws->Bool{var c=URLComponents(url:baseURL.appendingPathComponent("rest/v1/follows"),resolvingAgainstBaseURL:false)!;c.queryItems=[URLQueryItem(name:"follower_id",value:"eq.\(userID.uuidString)"),URLQueryItem(name:"following_id",value:"eq.\(targetID.uuidString)")];let r:URLRequest;if following{var x=URLRequest(url:c.url!);x.httpMethod="DELETE";x.setValue(publishableKey,forHTTPHeaderField:"apikey");x.setValue("Bearer \(accessToken)",forHTTPHeaderField:"Authorization");r=x}else{var x=request(path:"rest/v1/follows",method:"POST",body:try JSONEncoder.lastCall.encode(FollowInsert(followerId:userID,followingId:targetID)),accessToken:accessToken);x.setValue("return=minimal",forHTTPHeaderField:"Prefer");r=x};let(d,s)=try await URLSession.shared.data(for:r);try validate(s,data:d);return !following}
-    func startConversation(targetID:UUID,accessToken:String)async throws->UUID{let r=request(path:"rest/v1/rpc/start_conversation",method:"POST",body:try JSONEncoder.lastCall.encode(["target_user":targetID.uuidString]),accessToken:accessToken);let(d,s)=try await URLSession.shared.data(for:r);try validate(s,data:d);return try JSONDecoder.lastCall.decode(UUID.self,from:d)}
-    func fetchConversations(userID:UUID,accessToken:String)async throws->[ConversationRow]{var c=URLComponents(url:baseURL.appendingPathComponent("rest/v1/conversation_members"),resolvingAgainstBaseURL:false)!;c.queryItems=[URLQueryItem(name:"select",value:"conversation_id,status"),URLQueryItem(name:"user_id",value:"eq.\(userID.uuidString)"),URLQueryItem(name:"order",value:"joined_at.desc")];var r=URLRequest(url:c.url!);r.setValue(publishableKey,forHTTPHeaderField:"apikey");r.setValue("Bearer \(accessToken)",forHTTPHeaderField:"Authorization");let(d,s)=try await URLSession.shared.data(for:r);try validate(s,data:d);let m=try JSONDecoder.lastCall.decode([MembershipRow].self,from:d);var result:[ConversationRow]=[];for x in m{let o=try await fetchOtherMember(conversationID:x.conversationId,userID:userID,accessToken:accessToken);guard let oid=o.first?.userId,let p=try await fetchProfile(userID:oid,accessToken:accessToken)else{continue};let latest=try await fetchLatestMessage(conversationID:x.conversationId,accessToken:accessToken);result.append(ConversationRow(id:x.conversationId,status:x.status,otherUser:p,latestMessage:latest))};return result}
-    func fetchMessages(conversationID:UUID,accessToken:String)async throws->[MessageRow]{var c=URLComponents(url:baseURL.appendingPathComponent("rest/v1/messages"),resolvingAgainstBaseURL:false)!;c.queryItems=[URLQueryItem(name:"select",value:"id,conversation_id,sender_id,body,created_at,read_at"),URLQueryItem(name:"conversation_id",value:"eq.\(conversationID.uuidString)"),URLQueryItem(name:"order",value:"created_at.asc"),URLQueryItem(name:"limit",value:"200")];var r=URLRequest(url:c.url!);r.setValue(publishableKey,forHTTPHeaderField:"apikey");r.setValue("Bearer \(accessToken)",forHTTPHeaderField:"Authorization");let(d,s)=try await URLSession.shared.data(for:r);try validate(s,data:d);return try JSONDecoder.lastCall.decode([MessageRow].self,from:d)}
-    func sendMessage(conversationID:UUID,senderID:UUID,body:String,accessToken:String)async throws{let r=request(path:"rest/v1/messages",method:"POST",body:try JSONEncoder.lastCall.encode(MessageInsert(conversationId:conversationID,senderId:senderID,body:body)),accessToken:accessToken);let(d,s)=try await URLSession.shared.data(for:r);try validate(s,data:d)}
-    func respondToMessageRequest(conversationID:UUID,decision:String,accessToken:String)async throws{let r=request(path:"rest/v1/rpc/respond_to_message_request",method:"POST",body:try JSONEncoder.lastCall.encode(["cid":conversationID.uuidString,"decision":decision]),accessToken:accessToken);let(d,s)=try await URLSession.shared.data(for:r);try validate(s,data:d)}
-    func fetchNotifications(userID:UUID,accessToken:String)async throws->[NotificationRow]{var c=URLComponents(url:baseURL.appendingPathComponent("rest/v1/notifications"),resolvingAgainstBaseURL:false)!;c.queryItems=[URLQueryItem(name:"select",value:"id,type,actor_id,story_id,conversation_id,read_at,created_at"),URLQueryItem(name:"user_id",value:"eq.\(userID.uuidString)"),URLQueryItem(name:"order",value:"created_at.desc"),URLQueryItem(name:"limit",value:"50")];var r=URLRequest(url:c.url!);r.setValue(publishableKey,forHTTPHeaderField:"apikey");r.setValue("Bearer \(accessToken)",forHTTPHeaderField:"Authorization");let(d,s)=try await URLSession.shared.data(for:r);try validate(s,data:d);return try JSONDecoder.lastCall.decode([NotificationRow].self,from:d)}
-    func markNotificationsRead(userID:UUID,accessToken:String)async throws{var c=URLComponents(url:baseURL.appendingPathComponent("rest/v1/notifications"),resolvingAgainstBaseURL:false)!;c.queryItems=[URLQueryItem(name:"user_id",value:"eq.\(userID.uuidString)"),URLQueryItem(name:"read_at",value:"is.null")];var r=URLRequest(url:c.url!);r.httpMethod="PATCH";r.setValue(publishableKey,forHTTPHeaderField:"apikey");r.setValue("Bearer \(accessToken)",forHTTPHeaderField:"Authorization");r.setValue("application/json",forHTTPHeaderField:"Content-Type");r.setValue("return=minimal",forHTTPHeaderField:"Prefer");r.httpBody=try JSONEncoder.lastCall.encode(["read_at":ISO8601DateFormatter().string(from:Date())]);let(d,s)=try await URLSession.shared.data(for:r);try validate(s,data:d)}
-    func fetchComments(storyID:UUID,accessToken:String?)async throws->[StoryComment]{var c=URLComponents(url:baseURL.appendingPathComponent("rest/v1/comments"),resolvingAgainstBaseURL:false)!;c.queryItems=[URLQueryItem(name:"select",value:"id,story_id,user_id,body,created_at"),URLQueryItem(name:"story_id",value:"eq.\(storyID.uuidString)"),URLQueryItem(name:"order",value:"created_at.asc"),URLQueryItem(name:"limit",value:"100")];var r=URLRequest(url:c.url!);r.setValue(publishableKey,forHTTPHeaderField:"apikey");r.setValue("Bearer \(accessToken ?? publishableKey)",forHTTPHeaderField:"Authorization");let(d,s)=try await URLSession.shared.data(for:r);try validate(s,data:d);return try JSONDecoder.lastCall.decode([StoryComment].self,from:d)}
-    func addComment(storyID:UUID,userID:UUID,body:String,accessToken:String)async throws->StoryComment{var r=request(path:"rest/v1/comments",method:"POST",body:try JSONEncoder.lastCall.encode(CommentInsert(storyId:storyID,userId:userID,body:body)),accessToken:accessToken);r.setValue("return=representation",forHTTPHeaderField:"Prefer");let(d,s)=try await URLSession.shared.data(for:r);try validate(s,data:d);return try JSONDecoder.lastCall.decode([StoryComment].self,from:d).first!}
-    private func fetchOtherMember(conversationID:UUID,userID:UUID,accessToken:String)async throws->[MembershipRow]{var c=URLComponents(url:baseURL.appendingPathComponent("rest/v1/conversation_members"),resolvingAgainstBaseURL:false)!;c.queryItems=[URLQueryItem(name:"select",value:"user_id,status"),URLQueryItem(name:"conversation_id",value:"eq.\(conversationID.uuidString)"),URLQueryItem(name:"user_id",value:"neq.\(userID.uuidString)"),URLQueryItem(name:"limit",value:"1")];var r=URLRequest(url:c.url!);r.setValue(publishableKey,forHTTPHeaderField:"apikey");r.setValue("Bearer \(accessToken)",forHTTPHeaderField:"Authorization");let(d,s)=try await URLSession.shared.data(for:r);try validate(s,data:d);return try JSONDecoder.lastCall.decode([MembershipRow].self,from:d)}
-    private func fetchLatestMessage(conversationID:UUID,accessToken:String)async throws->MessageRow?{var c=URLComponents(url:baseURL.appendingPathComponent("rest/v1/messages"),resolvingAgainstBaseURL:false)!;c.queryItems=[URLQueryItem(name:"select",value:"id,conversation_id,sender_id,body,created_at,read_at"),URLQueryItem(name:"conversation_id",value:"eq.\(conversationID.uuidString)"),URLQueryItem(name:"order",value:"created_at.desc"),URLQueryItem(name:"limit",value:"1")];var r=URLRequest(url:c.url!);r.setValue(publishableKey,forHTTPHeaderField:"apikey");r.setValue("Bearer \(accessToken)",forHTTPHeaderField:"Authorization");let(d,s)=try await URLSession.shared.data(for:r);try validate(s,data:d);return try JSONDecoder.lastCall.decode([MessageRow].self,from:d).first}
-    private func persist(_ a:AuthResponse){if let t=a.refreshToken{keychainSet(t)}};private func keychainSet(_ v:String){let d=Data(v.utf8);let q:[String:Any]=[kSecClass as String:kSecClassGenericPassword,kSecAttrService as String:keychainService,kSecAttrAccount as String:keychainAccount];SecItemDelete(q as CFDictionary);SecItemAdd(q.merging([kSecValueData as String:d]){_,n in n} as CFDictionary,nil)};private func keychainGet()->String?{let q:[String:Any]=[kSecClass as String:kSecClassGenericPassword,kSecAttrService as String:keychainService,kSecAttrAccount as String:keychainAccount,kSecReturnData as String:true,kSecMatchLimit as String:kSecMatchLimitOne];var o:AnyObject?;guard SecItemCopyMatching(q as CFDictionary,&o)==errSecSuccess,let d=o as? Data else{return nil};return String(data:d,encoding:.utf8)};private func clearSession(){let q:[String:Any]=[kSecClass as String:kSecClassGenericPassword,kSecAttrService as String:keychainService,kSecAttrAccount as String:keychainAccount];SecItemDelete(q as CFDictionary)};private func validate(_ response:URLResponse,data:Data)throws{guard let h=response as? HTTPURLResponse,(200...299).contains(h.statusCode)else{throw LastCallAPIError.server(String(data:data,encoding:.utf8) ?? "LAST CALL could not complete that request.")}}
+  static let shared = LastCallAPI()
+  private let baseURL = URL(string: "https://ccqyreaanjhfhglmmgkn.supabase.co")!
+  private let publishableKey = "sb_publishable_LHWzWXPoDCD0VBl1i6QeBg_uFXrS_yL"
+  private let keychainService = "com.lastcall.app.session"
+  private let keychainAccount = "supabase"
+  private init() {}
+  private func request(
+    path: String, method: String = "GET", body: Data? = nil, accessToken: String? = nil
+  ) -> URLRequest {
+    var r = URLRequest(url: baseURL.appendingPathComponent(path))
+    r.httpMethod = method
+    r.setValue(publishableKey, forHTTPHeaderField: "apikey")
+    r.setValue("application/json", forHTTPHeaderField: "Accept")
+    if let accessToken { r.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization") }
+    if body != nil { r.setValue("application/json", forHTTPHeaderField: "Content-Type") }
+    r.httpBody = body
+    return r
+  }
+  func fetchPublishedStories() async throws -> [RemoteStory] {
+    var c = URLComponents(
+      url: baseURL.appendingPathComponent("rest/v1/stories"), resolvingAgainstBaseURL: false)!
+    c.queryItems = [
+      URLQueryItem(
+        name: "select",
+        value: "id,author_id,title,body,category,city,country,anonymous_name,image_url,created_at"),
+      URLQueryItem(name: "status", value: "eq.published"),
+      URLQueryItem(name: "order", value: "created_at.desc"),
+      URLQueryItem(name: "limit", value: "30"),
+    ]
+    var r = URLRequest(url: c.url!)
+    r.setValue(publishableKey, forHTTPHeaderField: "apikey")
+    r.setValue("Bearer \(publishableKey)", forHTTPHeaderField: "Authorization")
+    let (d, s) = try await URLSession.shared.data(for: r)
+    try validate(s, data: d)
+    return try JSONDecoder.lastCall.decode([RemoteStory].self, from: d)
+  }
+  func fetchReactionStoryIDs(userID: UUID, accessToken: String) async throws -> Set<UUID> {
+    var c = URLComponents(
+      url: baseURL.appendingPathComponent("rest/v1/reactions"), resolvingAgainstBaseURL: false)!
+    c.queryItems = [
+      URLQueryItem(name: "select", value: "story_id"),
+      URLQueryItem(name: "user_id", value: "eq.\(userID.uuidString)"),
+      URLQueryItem(name: "kind", value: "eq.beer"),
+    ]
+    var r = URLRequest(url: c.url!)
+    r.setValue(publishableKey, forHTTPHeaderField: "apikey")
+    r.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+    let (d, s) = try await URLSession.shared.data(for: r)
+    try validate(s, data: d)
+    return Set(try JSONDecoder.lastCall.decode([ReactionRow].self, from: d).map(\.storyId))
+  }
+  func fetchCommentCounts(storyIDs: [UUID], accessToken: String?) async throws -> [UUID: Int] {
+    guard !storyIDs.isEmpty else { return [:] }
+    var c = URLComponents(
+      url: baseURL.appendingPathComponent("rest/v1/comments"), resolvingAgainstBaseURL: false)!
+    c.queryItems = [
+      URLQueryItem(name: "select", value: "story_id"),
+      URLQueryItem(
+        name: "story_id", value: "in.(\(storyIDs.map(\.uuidString).joined(separator:",")))"),
+      URLQueryItem(name: "limit", value: "1000"),
+    ]
+    var r = URLRequest(url: c.url!)
+    r.setValue(publishableKey, forHTTPHeaderField: "apikey")
+    r.setValue("Bearer \(accessToken ?? publishableKey)", forHTTPHeaderField: "Authorization")
+    let (d, s) = try await URLSession.shared.data(for: r)
+    try validate(s, data: d)
+    let rows = try JSONDecoder.lastCall.decode([CommentCountRow].self, from: d)
+    return Dictionary(rows.map { ($0.storyId, 0) }) { a, _ in a }.merging(
+      rows.reduce(into: [UUID: Int]()) { $0[$1.storyId, default: 0]+ = 1 }
+    ) { _, new in new }
+  }
+  func toggleBeerReaction(storyID: UUID, userID: UUID, accessToken: String, reacted: Bool)
+    async throws -> Bool
+  {
+    var c = URLComponents(
+      url: baseURL.appendingPathComponent("rest/v1/reactions"), resolvingAgainstBaseURL: false)!
+    c.queryItems = [
+      URLQueryItem(name: "story_id", value: "eq.\(storyID.uuidString)"),
+      URLQueryItem(name: "user_id", value: "eq.\(userID.uuidString)"),
+      URLQueryItem(name: "kind", value: "eq.beer"),
+    ]
+    let r: URLRequest
+    if reacted {
+      var x = URLRequest(url: c.url!)
+      x.httpMethod = "DELETE"
+      x.setValue(publishableKey, forHTTPHeaderField: "apikey")
+      x.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+      r = x
+    } else {
+      var x = request(
+        path: "rest/v1/reactions", method: "POST",
+        body: try JSONEncoder.lastCall.encode(
+          ReactionInsert(storyId: storyID, userId: userID, kind: "beer")), accessToken: accessToken)
+      x.setValue("return = minimal", forHTTPHeaderField: "Prefer")
+      r = x
+    }
+    let (d, s) = try await URLSession.shared.data(for: r)
+    try validate(s, data: d)
+    return !reacted
+  }
+  func signUp(email: String, password: String, displayName: String?) async throws -> AuthResponse {
+    let r = request(
+      path: "auth/v1/signup", method: "POST",
+      body: try JSONEncoder.lastCall.encode(
+        AuthPayload(
+          email: email, password: password, data: displayName.map { ["display_name": $0] })))
+    let (d, s) = try await URLSession.shared.data(for: r)
+    try validate(s, data: d)
+    let a = try JSONDecoder.lastCall.decode(AuthResponse.self, from: d)
+    persist(a)
+    return a
+  }
+  func signIn(email: String, password: String) async throws -> AuthResponse {
+    let r = request(
+      path: "auth/v1/token?grant_type = password", method: "POST",
+      body: try JSONEncoder.lastCall.encode(
+        AuthPayload(email: email, password: password, data: nil)))
+    let (d, s) = try await URLSession.shared.data(for: r)
+    try validate(s, data: d)
+    let a = try JSONDecoder.lastCall.decode(AuthResponse.self, from: d)
+    persist(a)
+    return a
+  }
+  func restoreSession() async -> AuthResponse? {
+    guard let refreshToken = keychainGet() else { return nil }
+    do {
+      let r = request(
+        path: "auth/v1/token?grant_type = refresh_token", method: "POST",
+        body: try JSONEncoder.lastCall.encode(RefreshPayload(refreshToken: refreshToken)))
+      let (d, s) = try await URLSession.shared.data(for: r)
+      try validate(s, data: d)
+      let a = try JSONDecoder.lastCall.decode(AuthResponse.self, from: d)
+      persist(a)
+      return a
+    } catch {
+      clearSession()
+      return nil
+    }
+  }
+  func signOut() { clearSession() }
+  func uploadStoryImage(jpeg: Data, userID: UUID, accessToken: String) async throws -> URL {
+    let name = "\(UUID().uuidString).jpg"
+    let url = baseURL.appendingPathComponent(
+      "storage/v1/object/story-media/\(userID.uuidString)/\(name)")
+    var r = URLRequest(url: url)
+    r.httpMethod = "POST"
+    r.httpBody = jpeg
+    r.setValue(publishableKey, forHTTPHeaderField: "apikey")
+    r.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+    r.setValue("image/jpeg", forHTTPHeaderField: "Content-Type")
+    r.setValue("false", forHTTPHeaderField: "x-upsert")
+    let (d, s) = try await URLSession.shared.data(for: r)
+    try validate(s, data: d)
+    return baseURL.appendingPathComponent(
+      "storage/v1/object/public/story-media/\(userID.uuidString)/\(name)")
+  }
+  func insertStory(
+    title: String, body: String, category: String, city: String?, country: String?, anonymous: Bool,
+    imageURL: URL?, accessToken: String, userID: UUID
+  ) async throws {
+    let p = StoryInsert(
+      authorId: userID, title: title.isEmpty ? "Untitled story" : title, body: body,
+      category: category, city: city?.nilIfEmpty, country: country?.nilIfEmpty,
+      anonymousName: anonymous ? "Anonymous" : nil, imageURL: imageURL?.absoluteString,
+      status: "pending")
+    var r = request(
+      path: "rest/v1/stories", method: "POST", body: try JSONEncoder.lastCall.encode(p),
+      accessToken: accessToken)
+    r.setValue("return = minimal", forHTTPHeaderField: "Prefer")
+    let (d, s) = try await URLSession.shared.data(for: r)
+    try validate(s, data: d)
+  }
+  private func profileSelect() -> String {
+    "id,display_name,username,bio,avatar_url,is_anonymous,privacy_followers,privacy_messages"
+  }
+  func fetchProfile(userID: UUID, accessToken: String) async throws -> ProfileRow? {
+    var c = URLComponents(
+      url: baseURL.appendingPathComponent("rest/v1/profiles"), resolvingAgainstBaseURL: false)!
+    c.queryItems = [
+      URLQueryItem(name: "select", value: profileSelect()),
+      URLQueryItem(name: "id", value: "eq.\(userID.uuidString)"),
+      URLQueryItem(name: "limit", value: "1"),
+    ]
+    var r = URLRequest(url: c.url!)
+    r.setValue(publishableKey, forHTTPHeaderField: "apikey")
+    r.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+    let (d, s) = try await URLSession.shared.data(for: r)
+    try validate(s, data: d)
+    return try JSONDecoder.lastCall.decode([ProfileRow].self, from: d).first
+  }
+  func fetchProfiles(excluding userID: UUID?, accessToken: String) async throws -> [ProfileRow] {
+    var c = URLComponents(
+      url: baseURL.appendingPathComponent("rest/v1/profiles"), resolvingAgainstBaseURL: false)!
+    var q = [
+      URLQueryItem(name: "select", value: profileSelect()),
+      URLQueryItem(name: "order", value: "created_at.desc"),
+      URLQueryItem(name: "limit", value: "40"),
+    ]
+    if let userID { q.append(URLQueryItem(name: "id", value: "neq.\(userID.uuidString)")) }
+    c.queryItems = q
+    var r = URLRequest(url: c.url!)
+    r.setValue(publishableKey, forHTTPHeaderField: "apikey")
+    r.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+    let (d, s) = try await URLSession.shared.data(for: r)
+    try validate(s, data: d)
+    return try JSONDecoder.lastCall.decode([ProfileRow].self, from: d)
+  }
+  func fetchProfiles(ids: [UUID], accessToken: String) async throws -> [ProfileRow] {
+    guard !ids.isEmpty else { return [] }
+    var c = URLComponents(
+      url: baseURL.appendingPathComponent("rest/v1/profiles"), resolvingAgainstBaseURL: false)!
+    c.queryItems = [
+      URLQueryItem(name: "select", value: profileSelect()),
+      URLQueryItem(name: "id", value: "in.(\(ids.map(\.uuidString).joined(separator:",")))"),
+      URLQueryItem(name: "limit", value: "40"),
+    ]
+    var r = URLRequest(url: c.url!)
+    r.setValue(publishableKey, forHTTPHeaderField: "apikey")
+    r.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+    let (d, s) = try await URLSession.shared.data(for: r)
+    try validate(s, data: d)
+    return try JSONDecoder.lastCall.decode([ProfileRow].self, from: d)
+  }
+  func updateProfile(
+    userID: UUID, displayName: String, username: String, bio: String, accessToken: String
+  ) async throws -> ProfileRow? {
+    var c = URLComponents(
+      url: baseURL.appendingPathComponent("rest/v1/profiles"), resolvingAgainstBaseURL: false)!
+    c.queryItems = [URLQueryItem(name: "id", value: "eq.\(userID.uuidString)")]
+    var r = request(
+      path: "rest/v1/profiles", method: "PATCH",
+      body: try JSONEncoder.lastCall.encode(
+        ProfileUpdate(
+          displayName: displayName.nilIfEmpty, username: username.nilIfEmpty, bio: bio.nilIfEmpty)),
+      accessToken: accessToken)
+    r.url = c.url!
+    r.setValue("return = representation", forHTTPHeaderField: "Prefer")
+    let (d, s) = try await URLSession.shared.data(for: r)
+    try validate(s, data: d)
+    return try JSONDecoder.lastCall.decode([ProfileRow].self, from: d).first
+  }
+  func fetchProfileStats(userID: UUID, accessToken: String) async throws -> ProfileStats {
+    let stories = try await fetchCount(
+      path: "rest/v1/stories",
+      filters: [("author_id", "eq.\(userID.uuidString)"), ("status", "eq.published")],
+      accessToken: accessToken)
+    let followers = try await fetchCount(
+      path: "rest/v1/follows", filters: [("following_id", "eq.\(userID.uuidString)")],
+      accessToken: accessToken)
+    let following = try await fetchCount(
+      path: "rest/v1/follows", filters: [("follower_id", "eq.\(userID.uuidString)")],
+      accessToken: accessToken)
+    return ProfileStats(stories: stories, followers: followers, following: following)
+  }
+  private func fetchCount(path: String, filters: [(String, String)], accessToken: String)
+    async throws -> Int
+  {
+    var c = URLComponents(
+      url: baseURL.appendingPathComponent(path), resolvingAgainstBaseURL: false)!
+    c.queryItems =
+      [URLQueryItem(name: "select", value: "id")]
+      + filters.map { URLQueryItem(name: $0.0, value: $0.1) }
+    var r = URLRequest(url: c.url!)
+    r.setValue(publishableKey, forHTTPHeaderField: "apikey")
+    r.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+    r.setValue("count = exact", forHTTPHeaderField: "Prefer")
+    r.setValue("0-0", forHTTPHeaderField: "Range")
+    let (d, s) = try await URLSession.shared.data(for: r)
+    try validate(s, data: d)
+    if let h = (s as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Range"),
+      let n = Int(h.split(separator: "/").last ?? "")
+    {
+      return n
+    }
+    return (try? JSONDecoder.lastCall.decode([[String: UUID]].self, from: d).count) ?? 0
+  }
+  func fetchFollowing(userID: UUID, accessToken: String) async throws -> Set<UUID> {
+    var c = URLComponents(
+      url: baseURL.appendingPathComponent("rest/v1/follows"), resolvingAgainstBaseURL: false)!
+    c.queryItems = [
+      URLQueryItem(name: "select", value: "following_id"),
+      URLQueryItem(name: "follower_id", value: "eq.\(userID.uuidString)"),
+    ]
+    var r = URLRequest(url: c.url!)
+    r.setValue(publishableKey, forHTTPHeaderField: "apikey")
+    r.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+    let (d, s) = try await URLSession.shared.data(for: r)
+    try validate(s, data: d)
+    return Set(try JSONDecoder.lastCall.decode([FollowRow].self, from: d).map(\.followingId))
+  }
+  func toggleFollow(targetID: UUID, userID: UUID, accessToken: String, following: Bool) async throws
+    -> Bool
+  {
+    var c = URLComponents(
+      url: baseURL.appendingPathComponent("rest/v1/follows"), resolvingAgainstBaseURL: false)!
+    c.queryItems = [
+      URLQueryItem(name: "follower_id", value: "eq.\(userID.uuidString)"),
+      URLQueryItem(name: "following_id", value: "eq.\(targetID.uuidString)"),
+    ]
+    let r: URLRequest
+    if following {
+      var x = URLRequest(url: c.url!)
+      x.httpMethod = "DELETE"
+      x.setValue(publishableKey, forHTTPHeaderField: "apikey")
+      x.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+      r = x
+    } else {
+      var x = request(
+        path: "rest/v1/follows", method: "POST",
+        body: try JSONEncoder.lastCall.encode(
+          FollowInsert(followerId: userID, followingId: targetID)), accessToken: accessToken)
+      x.setValue("return = minimal", forHTTPHeaderField: "Prefer")
+      r = x
+    }
+    let (d, s) = try await URLSession.shared.data(for: r)
+    try validate(s, data: d)
+    return !following
+  }
+  func startConversation(targetID: UUID, accessToken: String) async throws -> UUID {
+    let r = request(
+      path: "rest/v1/rpc/start_conversation", method: "POST",
+      body: try JSONEncoder.lastCall.encode(["target_user": targetID.uuidString]),
+      accessToken: accessToken)
+    let (d, s) = try await URLSession.shared.data(for: r)
+    try validate(s, data: d)
+    return try JSONDecoder.lastCall.decode(UUID.self, from: d)
+  }
+  func fetchConversations(userID: UUID, accessToken: String) async throws -> [ConversationRow] {
+    var c = URLComponents(
+      url: baseURL.appendingPathComponent("rest/v1/conversation_members"),
+      resolvingAgainstBaseURL: false)!
+    c.queryItems = [
+      URLQueryItem(name: "select", value: "conversation_id,status"),
+      URLQueryItem(name: "user_id", value: "eq.\(userID.uuidString)"),
+      URLQueryItem(name: "order", value: "joined_at.desc"),
+    ]
+    var r = URLRequest(url: c.url!)
+    r.setValue(publishableKey, forHTTPHeaderField: "apikey")
+    r.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+    let (d, s) = try await URLSession.shared.data(for: r)
+    try validate(s, data: d)
+    let m = try JSONDecoder.lastCall.decode([MembershipRow].self, from: d)
+    var result: [ConversationRow] = []
+    for x in m {
+      let o = try await fetchOtherMember(
+        conversationID: x.conversationId, userID: userID, accessToken: accessToken)
+      guard let oid = o.first?.userId,
+        let p = try await fetchProfile(userID: oid, accessToken: accessToken)
+      else { continue }
+      let latest = try await fetchLatestMessage(
+        conversationID: x.conversationId, accessToken: accessToken)
+      result.append(
+        ConversationRow(id: x.conversationId, status: x.status, otherUser: p, latestMessage: latest)
+      )
+    }
+    return result
+  }
+  func fetchMessages(conversationID: UUID, accessToken: String) async throws -> [MessageRow] {
+    var c = URLComponents(
+      url: baseURL.appendingPathComponent("rest/v1/messages"), resolvingAgainstBaseURL: false)!
+    c.queryItems = [
+      URLQueryItem(name: "select", value: "id,conversation_id,sender_id,body,created_at,read_at"),
+      URLQueryItem(name: "conversation_id", value: "eq.\(conversationID.uuidString)"),
+      URLQueryItem(name: "order", value: "created_at.asc"),
+      URLQueryItem(name: "limit", value: "200"),
+    ]
+    var r = URLRequest(url: c.url!)
+    r.setValue(publishableKey, forHTTPHeaderField: "apikey")
+    r.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+    let (d, s) = try await URLSession.shared.data(for: r)
+    try validate(s, data: d)
+    return try JSONDecoder.lastCall.decode([MessageRow].self, from: d)
+  }
+  func sendMessage(conversationID: UUID, senderID: UUID, body: String, accessToken: String)
+    async throws
+  {
+    let r = request(
+      path: "rest/v1/messages", method: "POST",
+      body: try JSONEncoder.lastCall.encode(
+        MessageInsert(conversationId: conversationID, senderId: senderID, body: body)),
+      accessToken: accessToken)
+    let (d, s) = try await URLSession.shared.data(for: r)
+    try validate(s, data: d)
+  }
+  func respondToMessageRequest(conversationID: UUID, decision: String, accessToken: String)
+    async throws
+  {
+    let r = request(
+      path: "rest/v1/rpc/respond_to_message_request", method: "POST",
+      body: try JSONEncoder.lastCall.encode([
+        "cid": conversationID.uuidString, "decision": decision,
+      ]), accessToken: accessToken)
+    let (d, s) = try await URLSession.shared.data(for: r)
+    try validate(s, data: d)
+  }
+  func fetchNotifications(userID: UUID, accessToken: String) async throws -> [NotificationRow] {
+    var c = URLComponents(
+      url: baseURL.appendingPathComponent("rest/v1/notifications"), resolvingAgainstBaseURL: false)!
+    c.queryItems = [
+      URLQueryItem(
+        name: "select", value: "id,type,actor_id,story_id,conversation_id,read_at,created_at"),
+      URLQueryItem(name: "user_id", value: "eq.\(userID.uuidString)"),
+      URLQueryItem(name: "order", value: "created_at.desc"),
+      URLQueryItem(name: "limit", value: "50"),
+    ]
+    var r = URLRequest(url: c.url!)
+    r.setValue(publishableKey, forHTTPHeaderField: "apikey")
+    r.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+    let (d, s) = try await URLSession.shared.data(for: r)
+    try validate(s, data: d)
+    return try JSONDecoder.lastCall.decode([NotificationRow].self, from: d)
+  }
+  func markNotificationsRead(userID: UUID, accessToken: String) async throws {
+    var c = URLComponents(
+      url: baseURL.appendingPathComponent("rest/v1/notifications"), resolvingAgainstBaseURL: false)!
+    c.queryItems = [
+      URLQueryItem(name: "user_id", value: "eq.\(userID.uuidString)"),
+      URLQueryItem(name: "read_at", value: "is.null"),
+    ]
+    var r = URLRequest(url: c.url!)
+    r.httpMethod = "PATCH"
+    r.setValue(publishableKey, forHTTPHeaderField: "apikey")
+    r.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+    r.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    r.setValue("return = minimal", forHTTPHeaderField: "Prefer")
+    r.httpBody = try JSONEncoder.lastCall.encode([
+      "read_at": ISO8601DateFormatter().string(from: Date())
+    ])
+    let (d, s) = try await URLSession.shared.data(for: r)
+    try validate(s, data: d)
+  }
+  func fetchComments(storyID: UUID, accessToken: String?) async throws -> [StoryComment] {
+    var c = URLComponents(
+      url: baseURL.appendingPathComponent("rest/v1/comments"), resolvingAgainstBaseURL: false)!
+    c.queryItems = [
+      URLQueryItem(name: "select", value: "id,story_id,user_id,body,created_at"),
+      URLQueryItem(name: "story_id", value: "eq.\(storyID.uuidString)"),
+      URLQueryItem(name: "order", value: "created_at.asc"),
+      URLQueryItem(name: "limit", value: "100"),
+    ]
+    var r = URLRequest(url: c.url!)
+    r.setValue(publishableKey, forHTTPHeaderField: "apikey")
+    r.setValue("Bearer \(accessToken ?? publishableKey)", forHTTPHeaderField: "Authorization")
+    let (d, s) = try await URLSession.shared.data(for: r)
+    try validate(s, data: d)
+    return try JSONDecoder.lastCall.decode([StoryComment].self, from: d)
+  }
+  func addComment(storyID: UUID, userID: UUID, body: String, accessToken: String) async throws
+    -> StoryComment
+  {
+    var r = request(
+      path: "rest/v1/comments", method: "POST",
+      body: try JSONEncoder.lastCall.encode(
+        CommentInsert(storyId: storyID, userId: userID, body: body)), accessToken: accessToken)
+    r.setValue("return = representation", forHTTPHeaderField: "Prefer")
+    let (d, s) = try await URLSession.shared.data(for: r)
+    try validate(s, data: d)
+    return try JSONDecoder.lastCall.decode([StoryComment].self, from: d).first!
+  }
+  private func fetchOtherMember(conversationID: UUID, userID: UUID, accessToken: String)
+    async throws -> [MembershipRow]
+  {
+    var c = URLComponents(
+      url: baseURL.appendingPathComponent("rest/v1/conversation_members"),
+      resolvingAgainstBaseURL: false)!
+    c.queryItems = [
+      URLQueryItem(name: "select", value: "user_id,status"),
+      URLQueryItem(name: "conversation_id", value: "eq.\(conversationID.uuidString)"),
+      URLQueryItem(name: "user_id", value: "neq.\(userID.uuidString)"),
+      URLQueryItem(name: "limit", value: "1"),
+    ]
+    var r = URLRequest(url: c.url!)
+    r.setValue(publishableKey, forHTTPHeaderField: "apikey")
+    r.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+    let (d, s) = try await URLSession.shared.data(for: r)
+    try validate(s, data: d)
+    return try JSONDecoder.lastCall.decode([MembershipRow].self, from: d)
+  }
+  private func fetchLatestMessage(conversationID: UUID, accessToken: String) async throws
+    -> MessageRow?
+  {
+    var c = URLComponents(
+      url: baseURL.appendingPathComponent("rest/v1/messages"), resolvingAgainstBaseURL: false)!
+    c.queryItems = [
+      URLQueryItem(name: "select", value: "id,conversation_id,sender_id,body,created_at,read_at"),
+      URLQueryItem(name: "conversation_id", value: "eq.\(conversationID.uuidString)"),
+      URLQueryItem(name: "order", value: "created_at.desc"),
+      URLQueryItem(name: "limit", value: "1"),
+    ]
+    var r = URLRequest(url: c.url!)
+    r.setValue(publishableKey, forHTTPHeaderField: "apikey")
+    r.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+    let (d, s) = try await URLSession.shared.data(for: r)
+    try validate(s, data: d)
+    return try JSONDecoder.lastCall.decode([MessageRow].self, from: d).first
+  }
+  private func persist(_ a: AuthResponse) { if let t = a.refreshToken { keychainSet(t) } }
+  private func keychainSet(_ v: String) {
+    let d = Data(v.utf8)
+    let q: [String: Any] = [
+      kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: keychainService,
+      kSecAttrAccount as String: keychainAccount,
+    ]
+    SecItemDelete(q as CFDictionary)
+    SecItemAdd(q.merging([kSecValueData as String: d]) { _, n in n } as CFDictionary, nil)
+  }
+  private func keychainGet() -> String? {
+    let q: [String: Any] = [
+      kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: keychainService,
+      kSecAttrAccount as String: keychainAccount, kSecReturnData as String: true,
+      kSecMatchLimit as String: kSecMatchLimitOne,
+    ]
+    var o: AnyObject?
+    guard SecItemCopyMatching(q as CFDictionary, &o) == errSecSuccess, let d = o as? Data else {
+      return nil
+    }
+    return String(data: d, encoding: .utf8)
+  }
+  private func clearSession() {
+    let q: [String: Any] = [
+      kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: keychainService,
+      kSecAttrAccount as String: keychainAccount,
+    ]
+    SecItemDelete(q as CFDictionary)
+  }
+  private func validate(_ response: URLResponse, data: Data) throws {
+    guard let h = response as? HTTPURLResponse, (200...299).contains(h.statusCode) else {
+      throw LastCallAPIError.server(
+        String(data: data, encoding: .utf8) ?? "LAST CALL could not complete that request.")
+    }
+  }
 }
-struct RemoteStory:Decodable,Identifiable{let id:UUID;let authorId:UUID?;let title:String;let body:String;let category:String;let city:String?;let country:String?;let anonymousName:String?;let imageURL:String?;let createdAt:String;var location:String{[city,country].compactMap{$0}.filter{!$0.isEmpty}.joined(separator:", ")}}
-struct ReactionRow:Decodable{let storyId:UUID};struct CommentCountRow:Decodable{let storyId:UUID};struct ReactionInsert:Encodable{let storyId:UUID;let userId:UUID;let kind:String};struct StoryInsert:Encodable{let authorId:UUID;let title:String;let body:String;let category:String;let city:String?;let country:String?;let anonymousName:String?;let imageURL:String?;let status:String};struct FollowRow:Decodable{let followingId:UUID};struct FollowInsert:Encodable{let followerId:UUID;let followingId:UUID}
-struct ProfileRow:Decodable,Identifiable{let id:UUID;let displayName:String?;let username:String?;let bio:String?;let avatarURL:String?;let isAnonymous:Bool;let privacyFollowers:String;let privacyMessages:String;var publicName:String{isAnonymous ? (username ?? "LAST CALL member"):(displayName ?? username ?? "LAST CALL member")}}
-struct ProfileUpdate:Encodable{let displayName:String?;let username:String?;let bio:String?};struct ProfileStats{let stories:Int;let followers:Int;let following:Int};struct MembershipRow:Decodable{let conversationId:UUID;let userId:UUID?;let status:String};struct ConversationRow:Identifiable{let id:UUID;let status:String;let otherUser:ProfileRow;let latestMessage:MessageRow?};struct MessageRow:Decodable,Identifiable{let id:UUID;let conversationId:UUID;let senderId:UUID;let body:String;let createdAt:String;let readAt:String?;var dateValue:Date{ISO8601DateFormatter().date(from:createdAt) ?? Date()}};struct MessageInsert:Encodable{let conversationId:UUID;let senderId:UUID;let body:String};struct NotificationRow:Decodable,Identifiable{let id:UUID;let type:String;let actorId:UUID?;let storyId:UUID?;let conversationId:UUID?;let readAt:String?;let createdAt:String;var dateValue:Date{ISO8601DateFormatter().date(from:createdAt) ?? Date()}};struct StoryComment:Decodable,Identifiable{let id:UUID;let storyId:UUID;let userId:UUID;let body:String;let createdAt:String;var dateValue:Date{ISO8601DateFormatter().date(from:createdAt) ?? Date()}};struct CommentInsert:Encodable{let storyId:UUID;let userId:UUID;let body:String};struct AuthPayload:Encodable{let email:String;let password:String;let data:[String:String]?};struct RefreshPayload:Encodable{let refreshToken:String};struct AuthResponse:Decodable{let accessToken:String?;let refreshToken:String?;let user:AuthUser?};struct AuthUser:Decodable{let id:UUID;let email:String?}
-enum LastCallAPIError:LocalizedError{case server(String);var errorDescription:String?{if case .server(let message)=self{return message};return nil}};extension String{var nilIfEmpty:String?{isEmpty ? nil:self}};extension JSONDecoder{static var lastCall:JSONDecoder{let d=JSONDecoder();d.keyDecodingStrategy=.convertFromSnakeCase;return d}};extension JSONEncoder{static var lastCall:JSONEncoder{let e=JSONEncoder();e.keyEncodingStrategy=.convertToSnakeCase;return e}}
+struct RemoteStory: Decodable, Identifiable {
+  let id: UUID
+  let authorId: UUID?
+  let title: String
+  let body: String
+  let category: String
+  let city: String?
+  let country: String?
+  let anonymousName: String?
+  let imageURL: String?
+  let createdAt: String
+  var location: String {
+    [city, country].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ", ")
+  }
+}
+struct ReactionRow: Decodable { let storyId: UUID }
+struct CommentCountRow: Decodable { let storyId: UUID }
+struct ReactionInsert: Encodable {
+  let storyId: UUID
+  let userId: UUID
+  let kind: String
+}
+struct StoryInsert: Encodable {
+  let authorId: UUID
+  let title: String
+  let body: String
+  let category: String
+  let city: String?
+  let country: String?
+  let anonymousName: String?
+  let imageURL: String?
+  let status: String
+}
+struct FollowRow: Decodable { let followingId: UUID }
+struct FollowInsert: Encodable {
+  let followerId: UUID
+  let followingId: UUID
+}
+struct ProfileRow: Decodable, Identifiable {
+  let id: UUID
+  let displayName: String?
+  let username: String?
+  let bio: String?
+  let avatarURL: String?
+  let isAnonymous: Bool
+  let privacyFollowers: String
+  let privacyMessages: String
+  var publicName: String {
+    isAnonymous ? (username ?? "LAST CALL member") : (displayName ?? username ?? "LAST CALL member")
+  }
+}
+struct ProfileUpdate: Encodable {
+  let displayName: String?
+  let username: String?
+  let bio: String?
+}
+struct ProfileStats {
+  let stories: Int
+  let followers: Int
+  let following: Int
+}
+struct MembershipRow: Decodable {
+  let conversationId: UUID
+  let userId: UUID?
+  let status: String
+}
+struct ConversationRow: Identifiable {
+  let id: UUID
+  let status: String
+  let otherUser: ProfileRow
+  let latestMessage: MessageRow?
+}
+struct MessageRow: Decodable, Identifiable {
+  let id: UUID
+  let conversationId: UUID
+  let senderId: UUID
+  let body: String
+  let createdAt: String
+  let readAt: String?
+  var dateValue: Date { ISO8601DateFormatter().date(from: createdAt) ?? Date() }
+}
+struct MessageInsert: Encodable {
+  let conversationId: UUID
+  let senderId: UUID
+  let body: String
+}
+struct NotificationRow: Decodable, Identifiable {
+  let id: UUID
+  let type: String
+  let actorId: UUID?
+  let storyId: UUID?
+  let conversationId: UUID?
+  let readAt: String?
+  let createdAt: String
+  var dateValue: Date { ISO8601DateFormatter().date(from: createdAt) ?? Date() }
+}
+struct StoryComment: Decodable, Identifiable {
+  let id: UUID
+  let storyId: UUID
+  let userId: UUID
+  let body: String
+  let createdAt: String
+  var dateValue: Date { ISO8601DateFormatter().date(from: createdAt) ?? Date() }
+}
+struct CommentInsert: Encodable {
+  let storyId: UUID
+  let userId: UUID
+  let body: String
+}
+struct AuthPayload: Encodable {
+  let email: String
+  let password: String
+  let data: [String: String]?
+}
+struct RefreshPayload: Encodable { let refreshToken: String }
+struct AuthResponse: Decodable {
+  let accessToken: String?
+  let refreshToken: String?
+  let user: AuthUser?
+}
+struct AuthUser: Decodable {
+  let id: UUID
+  let email: String?
+}
+enum LastCallAPIError: LocalizedError {
+  case server(String)
+  var errorDescription: String? {
+    if case .server(let message) = self { return message }
+    return nil
+  }
+}
+extension String { var nilIfEmpty: String? { isEmpty ? nil : self } }
+extension JSONDecoder {
+  static var lastCall: JSONDecoder {
+    let d = JSONDecoder()
+    d.keyDecodingStrategy = .convertFromSnakeCase
+    return d
+  }
+}
+extension JSONEncoder {
+  static var lastCall: JSONEncoder {
+    let e = JSONEncoder()
+    e.keyEncodingStrategy = .convertToSnakeCase
+    return e
+  }
+}

@@ -1,329 +1,336 @@
 import SwiftUI
 
 struct ExploreView: View {
-    @EnvironmentObject private var model: NativeAppModel
-    @State private var query = ""
-    @State private var mode: ExploreMode = .stories
-    @State private var profiles: [ProfileRow] = []
-    @State private var following = Set<UUID>()
-    @State private var selectedStory: NativeStory?
-    @State private var loadingPeople = false
+  @EnvironmentObject private var model: NativeAppModel
+  @State private var query = ""
+  @State private var mode: ExploreMode = .stories
+  @State private var profiles: [ProfileRow] = []
+  @State private var following = Set<UUID>()
+  @State private var selectedStory: NativeStory?
+  @State private var loadingPeople = false
 
-    enum ExploreMode: String, CaseIterable {
-        case stories = "Stories"
-        case people = "People"
+  enum ExploreMode: String, CaseIterable {
+    case stories = "Stories"
+    case people = "People"
+  }
+
+  private var filteredStories: [NativeStory] {
+    let search = query.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !search.isEmpty else { return model.stories }
+    return model.stories.filter {
+      $0.title.localizedCaseInsensitiveContains(search)
+        || $0.body.localizedCaseInsensitiveContains(search)
+        || $0.category.localizedCaseInsensitiveContains(search)
+        || $0.location.localizedCaseInsensitiveContains(search)
     }
+  }
 
-    private var filteredStories: [NativeStory] {
-        let search = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !search.isEmpty else { return model.stories }
-        return model.stories.filter {
-            $0.title.localizedCaseInsensitiveContains(search) ||
-            $0.body.localizedCaseInsensitiveContains(search) ||
-            $0.category.localizedCaseInsensitiveContains(search) ||
-            $0.location.localizedCaseInsensitiveContains(search)
+  private var filteredProfiles: [ProfileRow] {
+    let search = query.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !search.isEmpty else { return profiles }
+    return profiles.filter {
+      $0.publicName.localizedCaseInsensitiveContains(search)
+        || ($0.username?.localizedCaseInsensitiveContains(search) ?? false)
+        || ($0.bio?.localizedCaseInsensitiveContains(search) ?? false)
+    }
+  }
+
+  var body: some View {
+    NavigationStack {
+      ScrollView(showsIndicators: false) {
+        VStack(alignment: .leading, spacing: 18) {
+          header
+          search
+          picker
+          if mode == .stories {
+            storiesSection
+          } else {
+            peopleSection
+          }
         }
+        .padding(.horizontal, 15)
+        .padding(.bottom, 30)
+      }
+      .background(Look.black.ignoresSafeArea())
+      .foregroundStyle(Look.cream)
+      .navigationBarHidden(true)
+      .refreshable { await refresh() }
+      .task { await refreshPeople() }
+      .sheet(item: $selectedStory) { NativeStoryDetail(story: $0) }
     }
+  }
 
-    private var filteredProfiles: [ProfileRow] {
-        let search = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !search.isEmpty else { return profiles }
-        return profiles.filter {
-            $0.publicName.localizedCaseInsensitiveContains(search) ||
-            ($0.username?.localizedCaseInsensitiveContains(search) ?? false) ||
-            ($0.bio?.localizedCaseInsensitiveContains(search) ?? false)
-        }
+  private var header: some View {
+    VStack(alignment: .leading, spacing: 5) {
+      Text("EXPLORE")
+        .font(.system(size: 30, weight: .bold, design: .serif))
+      Text("Find stories, people and the craic from behind the bar.")
+        .font(.system(size: 11, design: .serif))
+        .foregroundStyle(Look.muted)
     }
+    .padding(.top, 12)
+  }
 
-    var body: some View {
-        NavigationStack {
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 18) {
-                    header
-                    search
-                    picker
-                    if mode == .stories {
-                        storiesSection
-                    } else {
-                        peopleSection
-                    }
-                }
-                .padding(.horizontal, 15)
-                .padding(.bottom, 30)
-            }
-            .background(Look.black.ignoresSafeArea())
-            .foregroundStyle(Look.cream)
-            .navigationBarHidden(true)
-            .refreshable { await refresh() }
-            .task { await refreshPeople() }
-            .sheet(item: $selectedStory) { NativeStoryDetail(story: $0) }
-        }
+  private var search: some View {
+    HStack(spacing: 9) {
+      Image(systemName: "magnifyingglass").foregroundStyle(Look.gold)
+      TextField(
+        mode == .stories ? "Search stories, cities or categories" : "Search bartenders and members",
+        text: $query
+      )
+      .textInputAutocapitalization(.never)
+      .autocorrectionDisabled()
     }
+    .padding(12)
+    .background(Look.card)
+    .clipShape(RoundedRectangle(cornerRadius: 10))
+    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Look.line))
+  }
 
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text("EXPLORE")
-                .font(.system(size: 30, weight: .bold, design: .serif))
-            Text("Find stories, people and the craic from behind the bar.")
-                .font(.system(size: 11, design: .serif))
-                .foregroundStyle(Look.muted)
-        }
-        .padding(.top, 12)
-    }
-
-    private var search: some View {
-        HStack(spacing: 9) {
-            Image(systemName: "magnifyingglass").foregroundStyle(Look.gold)
-            TextField(
-                mode == .stories ? "Search stories, cities or categories" : "Search bartenders and members",
-                text: $query
-            )
-            .textInputAutocapitalization(.never)
-            .autocorrectionDisabled()
-        }
-        .padding(12)
-        .background(Look.card)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Look.line))
-    }
-
-    private var picker: some View {
-        HStack(spacing: 4) {
-            ForEach(ExploreMode.allCases, id: \.self) { item in
-                Button {
-                    withAnimation(.easeOut(duration: 0.18)) { mode = item }
-                } label: {
-                    Text(item.rawValue.uppercased())
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 9)
-                        .font(.system(size: 7, weight: .bold))
-                        .tracking(1)
-                        .foregroundStyle(mode == item ? Look.black : Look.muted)
-                        .background(mode == item ? Look.gold : Look.card)
-                        .clipShape(RoundedRectangle(cornerRadius: 7))
-                }
-                .buttonStyle(.plain)
-            }
-        }
-    }
-
-    private var storiesSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            sectionTitle("LATEST FROM BEHIND THE BAR")
-            if filteredStories.isEmpty {
-                emptyState(
-                    icon: "book.closed",
-                    title: query.isEmpty ? "No stories yet" : "Nothing matched",
-                    message: query.isEmpty ? "The community's first stories will appear here." : "Try another city, category or phrase."
-                )
-            } else {
-                ForEach(filteredStories) { story in
-                    ExploreStoryCard(story: story) { selectedStory = story }
-                }
-            }
-        }
-    }
-
-    private var peopleSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            sectionTitle("THE LAST CALL COMMUNITY")
-            if loadingPeople && profiles.isEmpty {
-                ProgressView().tint(Look.gold).frame(maxWidth: .infinity).padding(40)
-            } else if filteredProfiles.isEmpty {
-                emptyState(icon: "person.2", title: query.isEmpty ? "No other members yet" : "No members matched", message: "Try a different name or username.")
-            } else {
-                ForEach(filteredProfiles) { person in
-                    ExplorePersonRow(
-                        person: person,
-                        isFollowing: following.contains(person.id),
-                        follow: { toggleFollow(person) },
-                        message: { startMessage(person) },
-                        block: { block(person) },
-                        report: { report(person) }
-                    )
-                }
-            }
-        }
-    }
-
-    private func sectionTitle(_ text: String) -> some View {
-        Text(text)
+  private var picker: some View {
+    HStack(spacing: 4) {
+      ForEach(ExploreMode.allCases, id: \.self) { item in
+        Button {
+          withAnimation(.easeOut(duration: 0.18)) { mode = item }
+        } label: {
+          Text(item.rawValue.uppercased())
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 9)
             .font(.system(size: 7, weight: .bold))
-            .tracking(1.2)
-            .foregroundStyle(Look.gold)
-    }
-
-    private func emptyState(icon: String, title: String, message: String) -> some View {
-        VStack(spacing: 8) {
-            Image(systemName: icon).font(.system(size: 24)).foregroundStyle(Look.gold)
-            Text(title).font(.system(size: 16, weight: .bold, design: .serif))
-            Text(message)
-                .font(.system(size: 10, design: .serif))
-                .foregroundStyle(Look.muted)
-                .multilineTextAlignment(.center)
+            .tracking(1)
+            .foregroundStyle(mode == item ? Look.black : Look.muted)
+            .background(mode == item ? Look.gold : Look.card)
+            .clipShape(RoundedRectangle(cornerRadius: 7))
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 38)
-        .padding(.horizontal, 20)
-        .background(Look.card)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .buttonStyle(.plain)
+      }
     }
+  }
 
-    private func refresh() async {
-        await model.refreshStories()
-        await refreshPeople()
-    }
-
-    private func refreshPeople() async {
-        guard let token = model.token else { return }
-        loadingPeople = true
-        defer { loadingPeople = false }
-        do {
-            profiles = try await LastCallAPI.shared.fetchProfiles(excluding: model.user?.id, accessToken: token)
-            if let userID = model.user?.id {
-                following = try await LastCallAPI.shared.fetchFollowing(userID: userID, accessToken: token)
-            }
-        } catch {
-            model.error = "The community could not be refreshed just now."
+  private var storiesSection: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      sectionTitle("LATEST FROM BEHIND THE BAR")
+      if filteredStories.isEmpty {
+        emptyState(
+          icon: "book.closed",
+          title: query.isEmpty ? "No stories yet" : "Nothing matched",
+          message: query.isEmpty
+            ? "The community's first stories will appear here."
+            : "Try another city, category or phrase."
+        )
+      } else {
+        ForEach(filteredStories) { story in
+          ExploreStoryCard(story: story) { selectedStory = story }
         }
+      }
     }
+  }
 
-    private func toggleFollow(_ person: ProfileRow) {
-        guard let token = model.token, let userID = model.user?.id else { return }
-        let wasFollowing = following.contains(person.id)
-        if wasFollowing { following.remove(person.id) } else { following.insert(person.id) }
-        Task {
-            do {
-                _ = try await LastCallAPI.shared.toggleFollow(
-                    targetID: person.id,
-                    userID: userID,
-                    accessToken: token,
-                    following: wasFollowing
-                )
-            } catch {
-                if wasFollowing { following.insert(person.id) } else { following.remove(person.id) }
-                model.error = "That follow change could not be saved."
-            }
+  private var peopleSection: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      sectionTitle("THE LAST CALL COMMUNITY")
+      if loadingPeople && profiles.isEmpty {
+        ProgressView().tint(Look.gold).frame(maxWidth: .infinity).padding(40)
+      } else if filteredProfiles.isEmpty {
+        emptyState(
+          icon: "person.2", title: query.isEmpty ? "No other members yet" : "No members matched",
+          message: "Try a different name or username.")
+      } else {
+        ForEach(filteredProfiles) { person in
+          ExplorePersonRow(
+            person: person,
+            isFollowing: following.contains(person.id),
+            follow: { toggleFollow(person) },
+            message: { startMessage(person) },
+            block: { block(person) },
+            report: { report(person) }
+          )
         }
+      }
     }
+  }
 
-    private func startMessage(_ person: ProfileRow) {
-        guard let token = model.token else { return }
-        Task {
-            do {
-                _ = try await LastCallAPI.shared.startConversation(targetID: person.id, accessToken: token)
-                model.tab = .messages
-            } catch {
-                model.error = "A conversation could not be started."
-            }
-        }
-    }
+  private func sectionTitle(_ text: String) -> some View {
+    Text(text)
+      .font(.system(size: 7, weight: .bold))
+      .tracking(1.2)
+      .foregroundStyle(Look.gold)
+  }
 
-    private func block(_ person: ProfileRow) {
-        guard let token = model.token else { return }
-        Task {
-            do {
-                try await LastCallAPI.shared.blockUser(userID: person.id, accessToken: token)
-                profiles.removeAll { $0.id == person.id }
-            } catch {
-                model.error = "That member could not be blocked."
-            }
-        }
+  private func emptyState(icon: String, title: String, message: String) -> some View {
+    VStack(spacing: 8) {
+      Image(systemName: icon).font(.system(size: 24)).foregroundStyle(Look.gold)
+      Text(title).font(.system(size: 16, weight: .bold, design: .serif))
+      Text(message)
+        .font(.system(size: 10, design: .serif))
+        .foregroundStyle(Look.muted)
+        .multilineTextAlignment(.center)
     }
+    .frame(maxWidth: .infinity)
+    .padding(.vertical, 38)
+    .padding(.horizontal, 20)
+    .background(Look.card)
+    .clipShape(RoundedRectangle(cornerRadius: 12))
+  }
 
-    private func report(_ person: ProfileRow) {
-        guard let token = model.token, let userID = model.user?.id else { return }
-        Task {
-            do {
-                try await LastCallAPI.shared.reportUser(
-                    reporterID: userID,
-                    reportedUserID: person.id,
-                    reason: "Community standards",
-                    details: nil,
-                    accessToken: token
-                )
-            } catch {
-                model.error = "That report could not be submitted."
-            }
-        }
+  private func refresh() async {
+    await model.refreshStories()
+    await refreshPeople()
+  }
+
+  private func refreshPeople() async {
+    guard let token = model.token else { return }
+    loadingPeople = true
+    defer { loadingPeople = false }
+    do {
+      profiles = try await LastCallAPI.shared.fetchProfiles(
+        excluding: model.user?.id, accessToken: token)
+      if let userID = model.user?.id {
+        following = try await LastCallAPI.shared.fetchFollowing(userID: userID, accessToken: token)
+      }
+    } catch {
+      model.error = "The community could not be refreshed just now."
     }
+  }
+
+  private func toggleFollow(_ person: ProfileRow) {
+    guard let token = model.token, let userID = model.user?.id else { return }
+    let wasFollowing = following.contains(person.id)
+    if wasFollowing { following.remove(person.id) } else { following.insert(person.id) }
+    Task {
+      do {
+        _ = try await LastCallAPI.shared.toggleFollow(
+          targetID: person.id,
+          userID: userID,
+          accessToken: token,
+          following: wasFollowing
+        )
+      } catch {
+        if wasFollowing { following.insert(person.id) } else { following.remove(person.id) }
+        model.error = "That follow change could not be saved."
+      }
+    }
+  }
+
+  private func startMessage(_ person: ProfileRow) {
+    guard let token = model.token else { return }
+    Task {
+      do {
+        _ = try await LastCallAPI.shared.startConversation(targetID: person.id, accessToken: token)
+        model.tab = .messages
+      } catch {
+        model.error = "A conversation could not be started."
+      }
+    }
+  }
+
+  private func block(_ person: ProfileRow) {
+    guard let token = model.token else { return }
+    Task {
+      do {
+        try await LastCallAPI.shared.blockUser(userID: person.id, accessToken: token)
+        profiles.removeAll { $0.id == person.id }
+      } catch {
+        model.error = "That member could not be blocked."
+      }
+    }
+  }
+
+  private func report(_ person: ProfileRow) {
+    guard let token = model.token, let userID = model.user?.id else { return }
+    Task {
+      do {
+        try await LastCallAPI.shared.reportUser(
+          reporterID: userID,
+          reportedUserID: person.id,
+          reason: "Community standards",
+          details: nil,
+          accessToken: token
+        )
+      } catch {
+        model.error = "That report could not be submitted."
+      }
+    }
+  }
 }
 
 private struct ExploreStoryCard: View {
-    let story: NativeStory
-    let action: () -> Void
+  let story: NativeStory
+  let action: () -> Void
 
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 11) {
-                NativeImage(url: story.imageURL)
-                    .frame(width: 94, height: 92)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(story.category.uppercased())
-                        .font(.system(size: 6, weight: .bold))
-                        .tracking(1)
-                        .foregroundStyle(Look.gold)
-                    Text(story.title)
-                        .font(.system(size: 15, weight: .bold, design: .serif))
-                        .multilineTextAlignment(.leading)
-                        .lineLimit(3)
-                    Text("\(story.author) · \(story.location)")
-                        .font(.system(size: 7))
-                        .foregroundStyle(Look.muted)
-                        .lineLimit(1)
-                    Text("🍺 \(story.reactions)   ·   💬 \(story.comments)")
-                        .font(.system(size: 7, weight: .semibold))
-                        .foregroundStyle(Look.muted)
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(9)
-            .background(Look.card)
-            .clipShape(RoundedRectangle(cornerRadius: 11))
-            .overlay(RoundedRectangle(cornerRadius: 11).stroke(Look.line))
+  var body: some View {
+    Button(action: action) {
+      HStack(spacing: 11) {
+        NativeImage(url: story.imageURL)
+          .frame(width: 94, height: 92)
+          .clipShape(RoundedRectangle(cornerRadius: 8))
+        VStack(alignment: .leading, spacing: 5) {
+          Text(story.category.uppercased())
+            .font(.system(size: 6, weight: .bold))
+            .tracking(1)
+            .foregroundStyle(Look.gold)
+          Text(story.title)
+            .font(.system(size: 15, weight: .bold, design: .serif))
+            .multilineTextAlignment(.leading)
+            .lineLimit(3)
+          Text("\(story.author) · \(story.location)")
+            .font(.system(size: 7))
+            .foregroundStyle(Look.muted)
+            .lineLimit(1)
+          Text("🍺 \(story.reactions)   ·   💬 \(story.comments)")
+            .font(.system(size: 7, weight: .semibold))
+            .foregroundStyle(Look.muted)
         }
-        .buttonStyle(.plain)
+        Spacer(minLength: 0)
+      }
+      .padding(9)
+      .background(Look.card)
+      .clipShape(RoundedRectangle(cornerRadius: 11))
+      .overlay(RoundedRectangle(cornerRadius: 11).stroke(Look.line))
     }
+    .buttonStyle(.plain)
+  }
 }
 
 private struct ExplorePersonRow: View {
-    let person: ProfileRow
-    let isFollowing: Bool
-    let follow: () -> Void
-    let message: () -> Void
-    let block: () -> Void
-    let report: () -> Void
+  let person: ProfileRow
+  let isFollowing: Bool
+  let follow: () -> Void
+  let message: () -> Void
+  let block: () -> Void
+  let report: () -> Void
 
-    var body: some View {
-        HStack(spacing: 11) {
-            ProfileAvatar(profile: person, size: 46)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(person.publicName).font(.system(size: 14, weight: .bold, design: .serif))
-                if let username = person.username, !username.isEmpty {
-                    Text("@\(username)").font(.system(size: 8, weight: .medium)).foregroundStyle(Look.gold)
-                }
-                if let bio = person.bio, !bio.isEmpty {
-                    Text(bio).font(.system(size: 8, design: .serif)).foregroundStyle(Look.muted).lineLimit(2)
-                }
-            }
-            Spacer(minLength: 5)
-            VStack(spacing: 5) {
-                Button(isFollowing ? "FOLLOWING" : "FOLLOW", action: follow)
-                    .buttonStyle(OutlineButton())
-                if person.privacyMessages.lowercased() != "nobody" {
-                    Button(action: message) { Image(systemName: "message").font(.system(size: 11)) }
-                        .foregroundStyle(Look.gold)
-                }
-            }
+  var body: some View {
+    HStack(spacing: 11) {
+      ProfileAvatar(profile: person, size: 46)
+      VStack(alignment: .leading, spacing: 3) {
+        Text(person.publicName).font(.system(size: 14, weight: .bold, design: .serif))
+        if let username = person.username, !username.isEmpty {
+          Text("@\(username)").font(.system(size: 8, weight: .medium)).foregroundStyle(Look.gold)
         }
-        .padding(10)
-        .background(Look.card)
-        .clipShape(RoundedRectangle(cornerRadius: 11))
-        .overlay(RoundedRectangle(cornerRadius: 11).stroke(Look.line))
-        .contextMenu {
-            Button(action: report) { Label("Report member", systemImage: "flag") }
-            Button(role: .destructive, action: block) { Label("Block member", systemImage: "hand.raised") }
+        if let bio = person.bio, !bio.isEmpty {
+          Text(bio).font(.system(size: 8, design: .serif)).foregroundStyle(Look.muted).lineLimit(2)
         }
+      }
+      Spacer(minLength: 5)
+      VStack(spacing: 5) {
+        Button(isFollowing ? "FOLLOWING" : "FOLLOW", action: follow)
+          .buttonStyle(OutlineButton())
+        if person.privacyMessages.lowercased() != "nobody" {
+          Button(action: message) { Image(systemName: "message").font(.system(size: 11)) }
+            .foregroundStyle(Look.gold)
+        }
+      }
     }
+    .padding(10)
+    .background(Look.card)
+    .clipShape(RoundedRectangle(cornerRadius: 11))
+    .overlay(RoundedRectangle(cornerRadius: 11).stroke(Look.line))
+    .contextMenu {
+      Button(action: report) { Label("Report member", systemImage: "flag") }
+      Button(role: .destructive, action: block) {
+        Label("Block member", systemImage: "hand.raised")
+      }
+    }
+  }
 }
