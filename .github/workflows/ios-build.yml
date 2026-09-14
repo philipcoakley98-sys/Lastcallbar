@@ -25,15 +25,13 @@ jobs:
         run: xcodebuild -project ios/LastCall.xcodeproj -scheme LastCall -sdk iphonesimulator -configuration Release -derivedDataPath build/ReleaseDerivedData CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
       - name: Package simulator builds
         run: |
-          cd build/DebugDerivedData/Build/Products/Debug-iphonesimulator
-          ditto -c -k --sequesterRsrc --keepParent LastCall.app LastCall-Debug-Simulator.zip
-          cd ../Release-iphonesimulator
-          ditto -c -k --sequesterRsrc --keepParent LastCall.app LastCall-Release-Simulator.zip
+          ditto -c -k --sequesterRsrc --keepParent build/DebugDerivedData/Build/Products/Debug-iphonesimulator/LastCall.app build/LastCall-Debug-Simulator.zip
+          ditto -c -k --sequesterRsrc --keepParent build/ReleaseDerivedData/Build/Products/Release-iphonesimulator/LastCall.app build/LastCall-Release-Simulator.zip
       - name: Upload simulator builds
         uses: actions/upload-artifact@v4
         with:
           name: LastCall-iPhone-Simulator-Builds
           path: |
-            build/DebugDerivedData/Build/Products/Debug-iphonesimulator/LastCall-Debug-Simulator.zip
-            build/ReleaseDerivedData/Build/Products/Release-iphonesimulator/LastCall-Release-Simulator.zip
+            build/LastCall-Debug-Simulator.zip
+            build/LastCall-Release-Simulator.zip
           if-no-files-found: error
