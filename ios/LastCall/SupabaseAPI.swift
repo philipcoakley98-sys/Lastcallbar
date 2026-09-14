@@ -95,7 +95,7 @@ final class LastCallAPI {
         path: "rest/v1/reactions", method: "POST",
         body: try JSONEncoder.lastCall.encode(
           ReactionInsert(storyId: storyID, userId: userID, kind: "beer")), accessToken: accessToken)
-      x.setValue("return = minimal", forHTTPHeaderField: "Prefer")
+      x.setValue("return  =  minimal", forHTTPHeaderField: "Prefer")
       r = x
     }
     let (d, s) = try await URLSession.shared.data(for: r)
@@ -116,7 +116,7 @@ final class LastCallAPI {
   }
   func signIn(email: String, password: String) async throws -> AuthResponse {
     let r = request(
-      path: "auth/v1/token?grant_type = password", method: "POST",
+      path: "auth/v1/token?grant_type  =  password", method: "POST",
       body: try JSONEncoder.lastCall.encode(
         AuthPayload(email: email, password: password, data: nil)))
     let (d, s) = try await URLSession.shared.data(for: r)
@@ -129,7 +129,7 @@ final class LastCallAPI {
     guard let refreshToken = keychainGet() else { return nil }
     do {
       let r = request(
-        path: "auth/v1/token?grant_type = refresh_token", method: "POST",
+        path: "auth/v1/token?grant_type  =  refresh_token", method: "POST",
         body: try JSONEncoder.lastCall.encode(RefreshPayload(refreshToken: refreshToken)))
       let (d, s) = try await URLSession.shared.data(for: r)
       try validate(s, data: d)
@@ -170,7 +170,7 @@ final class LastCallAPI {
     var r = request(
       path: "rest/v1/stories", method: "POST", body: try JSONEncoder.lastCall.encode(p),
       accessToken: accessToken)
-    r.setValue("return = minimal", forHTTPHeaderField: "Prefer")
+    r.setValue("return  =  minimal", forHTTPHeaderField: "Prefer")
     let (d, s) = try await URLSession.shared.data(for: r)
     try validate(s, data: d)
   }
@@ -238,7 +238,7 @@ final class LastCallAPI {
           displayName: displayName.nilIfEmpty, username: username.nilIfEmpty, bio: bio.nilIfEmpty)),
       accessToken: accessToken)
     r.url = c.url!
-    r.setValue("return = representation", forHTTPHeaderField: "Prefer")
+    r.setValue("return  =  representation", forHTTPHeaderField: "Prefer")
     let (d, s) = try await URLSession.shared.data(for: r)
     try validate(s, data: d)
     return try JSONDecoder.lastCall.decode([ProfileRow].self, from: d).first
@@ -267,7 +267,7 @@ final class LastCallAPI {
     var r = URLRequest(url: c.url!)
     r.setValue(publishableKey, forHTTPHeaderField: "apikey")
     r.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-    r.setValue("count = exact", forHTTPHeaderField: "Prefer")
+    r.setValue("count  =  exact", forHTTPHeaderField: "Prefer")
     r.setValue("0-0", forHTTPHeaderField: "Range")
     let (d, s) = try await URLSession.shared.data(for: r)
     try validate(s, data: d)
@@ -313,7 +313,7 @@ final class LastCallAPI {
         path: "rest/v1/follows", method: "POST",
         body: try JSONEncoder.lastCall.encode(
           FollowInsert(followerId: userID, followingId: targetID)), accessToken: accessToken)
-      x.setValue("return = minimal", forHTTPHeaderField: "Prefer")
+      x.setValue("return  =  minimal", forHTTPHeaderField: "Prefer")
       r = x
     }
     let (d, s) = try await URLSession.shared.data(for: r)
@@ -426,7 +426,7 @@ final class LastCallAPI {
     r.setValue(publishableKey, forHTTPHeaderField: "apikey")
     r.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
     r.setValue("application/json", forHTTPHeaderField: "Content-Type")
-    r.setValue("return = minimal", forHTTPHeaderField: "Prefer")
+    r.setValue("return  =  minimal", forHTTPHeaderField: "Prefer")
     r.httpBody = try JSONEncoder.lastCall.encode([
       "read_at": ISO8601DateFormatter().string(from: Date())
     ])
@@ -456,7 +456,7 @@ final class LastCallAPI {
       path: "rest/v1/comments", method: "POST",
       body: try JSONEncoder.lastCall.encode(
         CommentInsert(storyId: storyID, userId: userID, body: body)), accessToken: accessToken)
-    r.setValue("return = representation", forHTTPHeaderField: "Prefer")
+    r.setValue("return  =  representation", forHTTPHeaderField: "Prefer")
     let (d, s) = try await URLSession.shared.data(for: r)
     try validate(s, data: d)
     return try JSONDecoder.lastCall.decode([StoryComment].self, from: d).first!
