@@ -24,7 +24,7 @@ final class LastCallAPI {
 
     func fetchPublishedStories() async throws -> [RemoteStory] {
         var components = URLComponents(url: baseURL.appendingPathComponent("rest/v1/stories"), resolvingAgainstBaseURL: false)!
-        components.queryItems = [URLQueryItem(name: "select", value: "id,title,body,category,city,country,anonymous_name,created_at"), URLQueryItem(name: "status", value: "eq.published"), URLQueryItem(name: "order", value: "created_at.desc"), URLQueryItem(name: "limit", value: "30")]
+        components.queryItems = [URLQueryItem(name: "select", value: "id,author_id,title,body,category,city,country,anonymous_name,created_at"), URLQueryItem(name: "status", value: "eq.published"), URLQueryItem(name: "order", value: "created_at.desc"), URLQueryItem(name: "limit", value: "30")]
         var request = URLRequest(url: components.url!)
         request.setValue(publishableKey, forHTTPHeaderField: "apikey")
         request.setValue("Bearer \(publishableKey)", forHTTPHeaderField: "Authorization")
@@ -106,7 +106,7 @@ final class LastCallAPI {
 
     func fetchProfile(userID: UUID, accessToken: String) async throws -> ProfileRow? {
         var components = URLComponents(url: baseURL.appendingPathComponent("rest/v1/profiles"), resolvingAgainstBaseURL: false)!
-        components.queryItems = [URLQueryItem(name: "select", value: "id,display_name,username,bio,is_anonymous,privacy_followers,privacy_messages"), URLQueryItem(name: "id", value: "eq.\(userID.uuidString)"), URLQueryItem(name: "limit", value: "1")]
+        components.queryItems = [URLQueryItem(name: "select", value: "id,display_name,username,bio,avatar_url,is_anonymous,privacy_followers,privacy_messages"), URLQueryItem(name: "id", value: "eq.\(userID.uuidString)"), URLQueryItem(name: "limit", value: "1")]
         var request = URLRequest(url: components.url!); request.setValue(publishableKey, forHTTPHeaderField: "apikey"); request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         let (data, response) = try await URLSession.shared.data(for: request); try validate(response, data: data)
         return try JSONDecoder.lastCall.decode([ProfileRow].self, from: data).first
@@ -114,9 +114,19 @@ final class LastCallAPI {
 
     func fetchProfiles(excluding userID: UUID?, accessToken: String) async throws -> [ProfileRow] {
         var components = URLComponents(url: baseURL.appendingPathComponent("rest/v1/profiles"), resolvingAgainstBaseURL: false)!
-        var items = [URLQueryItem(name: "select", value: "id,display_name,username,bio,is_anonymous,privacy_followers,privacy_messages"), URLQueryItem(name: "order", value: "created_at.desc"), URLQueryItem(name: "limit", value: "40")]
+        var items = [URLQueryItem(name: "select", value: "id,display_name,username,bio,avatar_url,is_anonymous,privacy_followers,privacy_messages"), URLQueryItem(name: "order", value: "created_at.desc"), URLQueryItem(name: "limit", value: "40")]
         if let userID { items.append(URLQueryItem(name: "id", value: "neq.\(userID.uuidString)")) }
         components.queryItems = items
+        var request = URLRequest(url: components.url!); request.setValue(publishableKey, forHTTPHeaderField: "apikey"); request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request); try validate(response, data: data)
+        return try JSONDecoder.lastCall.decode([ProfileRow].self, from: data)
+    }
+
+    func fetchProfiles(ids: [UUID], accessToken: String) async throws -> [ProfileRow] {
+        guard !ids.isEmpty else { return [] }
+        var components = URLComponents(url: baseURL.appendingPathComponent("rest/v1/profiles"), resolvingAgainstBaseURL: false)!
+        let values = ids.map(\.uuidString).joined(separator: ",")
+        components.queryItems = [URLQueryItem(name: "select", value: "id,display_name,username,bio,avatar_url,is_anonymous,privacy_followers,privacy_messages"), URLQueryItem(name: "id", value: "in.(\(values))"), URLQueryItem(name: "limit", value: "40")]
         var request = URLRequest(url: components.url!); request.setValue(publishableKey, forHTTPHeaderField: "apikey"); request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         let (data, response) = try await URLSession.shared.data(for: request); try validate(response, data: data)
         return try JSONDecoder.lastCall.decode([ProfileRow].self, from: data)
@@ -198,8 +208,7 @@ final class LastCallAPI {
     private func fetchLatestMessage(conversationID: UUID, accessToken: String) async throws -> MessageRow? {
         var components = URLComponents(url: baseURL.appendingPathComponent("rest/v1/messages"), resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "select", value: "id,conversation_id,sender_id,body,created_at,read_at"), URLQueryItem(name: "conversation_id", value: "eq.\(conversationID.uuidString)"), URLQueryItem(name: "order", value: "created_at.desc"), URLQueryItem(name: "limit", value: "1")]
-        var request = URLRequest(url: components.url!); request.setValue(publishableKey, forHTTPHeaderField: "apikey"); request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-        let (data, response) = try await URLSession.shared.data(for: request); try validate(response, data: data); return try JSONDecoder.lastCall.decode([MessageRow].self, from: data).first
+        var request = URLRequest(url: components.url!); request.setValue(publishableKey, forHTTPHeaderField: "apikey"); request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization"); let (data, response) = try await URLSession.shared.data(for: request); try validate(response, data: data); return try JSONDecoder.lastCall.decode([MessageRow].self, from: data).first
     }
 
     private func persist(_ auth: AuthResponse) { if let refreshToken = auth.refreshToken { keychainSet(refreshToken) } }
@@ -209,13 +218,13 @@ final class LastCallAPI {
     private func validate(_ response: URLResponse, data: Data) throws { guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else { throw LastCallAPIError.server(String(data: data, encoding: .utf8) ?? "LAST CALL could not complete that request.") } }
 }
 
-struct RemoteStory: Decodable, Identifiable { let id: UUID; let title: String; let body: String; let category: String; let city: String?; let country: String?; let anonymousName: String?; let createdAt: String; var location: String { [city, country].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ", ") } }
+struct RemoteStory: Decodable, Identifiable { let id: UUID; let authorId: UUID?; let title: String; let body: String; let category: String; let city: String?; let country: String?; let anonymousName: String?; let createdAt: String; var location: String { [city, country].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ", ") } }
 struct ReactionRow: Decodable { let storyId: UUID }
 struct ReactionInsert: Encodable { let storyId: UUID; let userId: UUID; let kind: String }
 struct StoryInsert: Encodable { let authorId: UUID; let title: String; let body: String; let category: String; let city: String?; let country: String?; let anonymousName: String?; let status: String }
 struct FollowRow: Decodable { let followingId: UUID }
 struct FollowInsert: Encodable { let followerId: UUID; let followingId: UUID }
-struct ProfileRow: Decodable, Identifiable { let id: UUID; let displayName: String?; let username: String?; let bio: String?; let isAnonymous: Bool; let privacyFollowers: String; let privacyMessages: String; var publicName: String { isAnonymous ? (username ?? "LAST CALL member") : (displayName ?? username ?? "LAST CALL member") } }
+struct ProfileRow: Decodable, Identifiable { let id: UUID; let displayName: String?; let username: String?; let bio: String?; let avatarURL: String?; let isAnonymous: Bool; let privacyFollowers: String; let privacyMessages: String; var publicName: String { isAnonymous ? (username ?? "LAST CALL member") : (displayName ?? username ?? "LAST CALL member") } }
 struct MembershipRow: Decodable { let conversationId: UUID; let userId: UUID?; let status: String }
 struct ConversationRow: Identifiable { let id: UUID; let status: String; let otherUser: ProfileRow; let latestMessage: MessageRow? }
 struct MessageRow: Decodable, Identifiable { let id: UUID; let conversationId: UUID; let senderId: UUID; let body: String; let createdAt: String; let readAt: String? }
