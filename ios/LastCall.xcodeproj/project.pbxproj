@@ -8,6 +8,7 @@
   A10000010000000000000003 /* NativeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000020000000000000003 /* NativeApp.swift */; };
   A10000010000000000000002 /* SupabaseAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000020000000000000002 /* SupabaseAPI.swift */; };
   A10000010000000000000004 /* NativeAppFeatures.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000020000000000000004 /* NativeAppFeatures.swift */; };
+  A10000010000000000000005 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = A10000020000000000000005 /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
 /* Begin PBXFileReference section */
   A10000030000000000000001 /* LastCall.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LastCall.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -15,13 +16,14 @@
   A10000020000000000000002 /* SupabaseAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseAPI.swift; sourceTree = "<group>"; };
   A10000020000000000000003 /* NativeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeApp.swift; sourceTree = "<group>"; };
   A10000020000000000000004 /* NativeAppFeatures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeAppFeatures.swift; sourceTree = "<group>"; };
+  A10000020000000000000005 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 /* Begin PBXFrameworksBuildPhase section */
   A10000040000000000000001 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXFrameworksBuildPhase section */
 /* Begin PBXGroup section */
   A10000050000000000000001 = {isa = PBXGroup; children = (A10000060000000000000001 /* LastCall */, A10000070000000000000001 /* Products */); sourceTree = "<group>"; };
-  A10000060000000000000001 /* LastCall */ = {isa = PBXGroup; children = (A10000020000000000000003 /* NativeApp.swift */, A10000020000000000000002 /* SupabaseAPI.swift */, A10000020000000000000004 /* NativeAppFeatures.swift */, A10000020000000000000001 /* LastCallApp.swift */); path = LastCall; sourceTree = "<group>"; };
+  A10000060000000000000001 /* LastCall */ = {isa = PBXGroup; children = (A10000020000000000000003 /* NativeApp.swift */, A10000020000000000000002 /* SupabaseAPI.swift */, A10000020000000000000004 /* NativeAppFeatures.swift */, A10000020000000000000001 /* LastCallApp.swift */, A10000020000000000000005 /* PrivacyInfo.xcprivacy */); path = LastCall; sourceTree = "<group>"; };
   A10000070000000000000001 /* Products */ = {isa = PBXGroup; children = (A10000030000000000000001 /* LastCall.app */); name = Products; sourceTree = "<group>"; };
 /* End PBXGroup section */
 /* Begin PBXNativeTarget section */
@@ -31,7 +33,7 @@
   A10000090000000000000001 /* Project object */ = {isa = PBXProject; attributes = {LastUpgradeCheck = 1600; TargetAttributes = {A10000080000000000000001 = {CreatedOnToolsVersion = 16.0;};};}; buildConfigurationList = A10000130000000000000001 /* Build configuration list for PBXProject "LastCall" */; compatibilityVersion = "Xcode 14.0"; developmentRegion = en; hasScannedForEncodings = 0; knownRegions = (en, Base); mainGroup = A10000050000000000000001; productRefGroup = A10000070000000000000001 /* Products */; projectDirPath = ""; projectRoot = ""; targets = (A10000080000000000000001 /* LastCall */); };
 /* End PBXProject section */
 /* Begin PBXResourcesBuildPhase section */
-  A10000120000000000000001 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+  A10000120000000000000001 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (A10000010000000000000005 /* PrivacyInfo.xcprivacy in Resources */); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXResourcesBuildPhase section */
 /* Begin PBXSourcesBuildPhase section */
   A10000110000000000000001 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A10000010000000000000003 /* NativeApp.swift in Sources */, A10000010000000000000002 /* SupabaseAPI.swift in Sources */, A10000010000000000000004 /* NativeAppFeatures.swift in Sources */); runOnlyForDeploymentPostprocessing = 0; };
