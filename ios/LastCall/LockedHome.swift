@@ -4,7 +4,7 @@ struct LockedHome: View {
   @EnvironmentObject private var model: NativeAppModel
   private let pubURL = URL(
     string:
-      "https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto   =   format&fit   =   crop&w   =   1200&q   =   90"
+      "https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto    =    format&fit    =    crop&w    =    1200&q    =    90"
   )
   var body: some View {
     GeometryReader { proxy in
