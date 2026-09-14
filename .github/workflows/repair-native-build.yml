@@ -17,29 +17,38 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Repair duplicate conversation presentation
+      - name: Repair native source issues
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          p = Path('ios/LastCall/NativeApp.swift')
-          s = p.read_text()
+
+          native = Path('ios/LastCall/NativeApp.swift')
+          s = native.read_text()
           s = s.replace('    @StateObject private var router = ConversationRouter.shared\n', '')
           old = '''        .sheet(item: Binding(get: { router.openID.map { ConversationRow(id: $0, otherUser: ProfileRow(id: UUID(), publicName: "LAST CALL", bio: nil, anonymous: true, privacyMessages: "nobody"), status: "accepted", latestMessage: nil) } }, set: { if $0 == nil { router.openID = nil } })) { conversation in NativeChat(conversation: conversation) }\n'''
           s = s.replace(old, '')
-          p.write_text(s)
+          native.write_text(s)
+
+          api = Path('ios/LastCall/SupabaseAPI.swift')
+          s = api.read_text()
+          for name in ('conversation_members', 'messages', 'notifications'):
+              needle = f'URLComponents(url: baseURL.appendingPathComponent("rest/v1/{name}"), resolvingAgainstBaseURL: false)\n'
+              replacement = f'URLComponents(url: baseURL.appendingPathComponent("rest/v1/{name}"), resolvingAgainstBaseURL: false)!\n'
+              s = s.replace(needle, replacement)
+          api.write_text(s)
           PY
 
       - name: Commit repair if needed
         shell: bash
         run: |
-          if git diff --quiet -- ios/LastCall/NativeApp.swift; then
+          if git diff --quiet -- ios/LastCall/NativeApp.swift ios/LastCall/SupabaseAPI.swift; then
             echo "No repair needed"
           else
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add ios/LastCall/NativeApp.swift
-            git commit -m "Fix native conversation sheet ownership"
+            git add ios/LastCall/NativeApp.swift ios/LastCall/SupabaseAPI.swift
+            git commit -m "Fix native source compilation issues"
             git push
           fi
 
