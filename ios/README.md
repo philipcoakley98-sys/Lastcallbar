@@ -9,7 +9,8 @@ The build follows the approved starter mockup:
 - dark Irish-pub editorial look
 - cream typography with gold accents and deep green actions
 - compact iPhone-first layout
-- six-tab navigation: Home, Stories, Write, People, Messages, Profile
+- five-tab navigation: Home, Stories, Write, Messages, Profile
+- Community / People is opened as an in-app sheet rather than a sixth root tab
 - Story of the Night feature
 - story detail, reactions, categories, community and messaging surfaces
 - welcoming, anonymous-friendly story submission
@@ -31,7 +32,7 @@ The native app connects to the existing LAST CALL Supabase project using the pub
 - secure message read marking
 - notifications with unread state and read marking
 - database-level privacy and blocking enforcement
-- `lastcall://` auth deep-link scheme prepared for confirmation/password-reset flows
+- `lastcall://` URL scheme reserved for future auth deep-link handling
 
 ## Project
 
