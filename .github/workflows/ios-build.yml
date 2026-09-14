@@ -27,7 +27,7 @@ jobs:
         run: |
           xcodebuild \
             -project ios/LastCall.xcodeproj \
-            -target LastCall \
+            -scheme LastCall \
             -sdk iphonesimulator \
             -configuration Debug \
             -derivedDataPath build/DerivedData \
