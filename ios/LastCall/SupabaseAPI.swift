@@ -146,7 +146,7 @@ final class LastCallAPI {
     }
 
     func fetchConversations(userID: UUID, accessToken: String) async throws -> [ConversationRow] {
-        var components = URLComponents(url: baseURL.appendingPathComponent("rest/v1/conversation_members"), resolvingAgainstBaseURL: false)
+        var components = URLComponents(url: baseURL.appendingPathComponent("rest/v1/conversation_members"), resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "select", value: "conversation_id,status"), URLQueryItem(name: "user_id", value: "eq.\(userID.uuidString)"), URLQueryItem(name: "order", value: "joined_at.desc")]
         var request = URLRequest(url: components.url!); request.setValue(publishableKey, forHTTPHeaderField: "apikey"); request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         let (data, response) = try await URLSession.shared.data(for: request); try validate(response, data: data)
@@ -157,7 +157,7 @@ final class LastCallAPI {
     }
 
     func fetchMessages(conversationID: UUID, accessToken: String) async throws -> [MessageRow] {
-        var components = URLComponents(url: baseURL.appendingPathComponent("rest/v1/messages"), resolvingAgainstBaseURL: false)
+        var components = URLComponents(url: baseURL.appendingPathComponent("rest/v1/messages"), resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "select", value: "id,conversation_id,sender_id,body,created_at,read_at"), URLQueryItem(name: "conversation_id", value: "eq.\(conversationID.uuidString)"), URLQueryItem(name: "order", value: "created_at.asc"), URLQueryItem(name: "limit", value: "200")]
         var request = URLRequest(url: components.url!); request.setValue(publishableKey, forHTTPHeaderField: "apikey"); request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         let (data, response) = try await URLSession.shared.data(for: request); try validate(response, data: data); return try JSONDecoder.lastCall.decode([MessageRow].self, from: data)
@@ -175,28 +175,28 @@ final class LastCallAPI {
     }
 
     func fetchNotifications(userID: UUID, accessToken: String) async throws -> [NotificationRow] {
-        var components = URLComponents(url: baseURL.appendingPathComponent("rest/v1/notifications"), resolvingAgainstBaseURL: false)
+        var components = URLComponents(url: baseURL.appendingPathComponent("rest/v1/notifications"), resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "select", value: "id,type,actor_id,story_id,conversation_id,read_at,created_at"), URLQueryItem(name: "user_id", value: "eq.\(userID.uuidString)"), URLQueryItem(name: "order", value: "created_at.desc"), URLQueryItem(name: "limit", value: "50")]
         var request = URLRequest(url: components.url!); request.setValue(publishableKey, forHTTPHeaderField: "apikey"); request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         let (data, response) = try await URLSession.shared.data(for: request); try validate(response, data: data); return try JSONDecoder.lastCall.decode([NotificationRow].self, from: data)
     }
 
     func markNotificationsRead(userID: UUID, accessToken: String) async throws {
-        var components = URLComponents(url: baseURL.appendingPathComponent("rest/v1/notifications"), resolvingAgainstBaseURL: false)
+        var components = URLComponents(url: baseURL.appendingPathComponent("rest/v1/notifications"), resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "user_id", value: "eq.\(userID.uuidString)"), URLQueryItem(name: "read_at", value: "is.null")]
         var request = URLRequest(url: components.url!); request.httpMethod = "PATCH"; request.setValue(publishableKey, forHTTPHeaderField: "apikey"); request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization"); request.setValue("application/json", forHTTPHeaderField: "Content-Type"); request.setValue("return=minimal", forHTTPHeaderField: "Prefer"); request.httpBody = try JSONEncoder.lastCall.encode(["read_at": ISO8601DateFormatter().string(from: Date())])
         let (data, response) = try await URLSession.shared.data(for: request); try validate(response, data: data)
     }
 
     private func fetchOtherMember(conversationID: UUID, userID: UUID, accessToken: String) async throws -> [MembershipRow] {
-        var components = URLComponents(url: baseURL.appendingPathComponent("rest/v1/conversation_members"), resolvingAgainstBaseURL: false)
+        var components = URLComponents(url: baseURL.appendingPathComponent("rest/v1/conversation_members"), resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "select", value: "user_id,status"), URLQueryItem(name: "conversation_id", value: "eq.\(conversationID.uuidString)"), URLQueryItem(name: "user_id", value: "neq.\(userID.uuidString)"), URLQueryItem(name: "limit", value: "1")]
         var request = URLRequest(url: components.url!); request.setValue(publishableKey, forHTTPHeaderField: "apikey"); request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         let (data, response) = try await URLSession.shared.data(for: request); try validate(response, data: data); return try JSONDecoder.lastCall.decode([MembershipRow].self, from: data)
     }
 
     private func fetchLatestMessage(conversationID: UUID, accessToken: String) async throws -> MessageRow? {
-        var components = URLComponents(url: baseURL.appendingPathComponent("rest/v1/messages"), resolvingAgainstBaseURL: false)
+        var components = URLComponents(url: baseURL.appendingPathComponent("rest/v1/messages"), resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "select", value: "id,conversation_id,sender_id,body,created_at,read_at"), URLQueryItem(name: "conversation_id", value: "eq.\(conversationID.uuidString)"), URLQueryItem(name: "order", value: "created_at.desc"), URLQueryItem(name: "limit", value: "1")]
         var request = URLRequest(url: components.url!); request.setValue(publishableKey, forHTTPHeaderField: "apikey"); request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         let (data, response) = try await URLSession.shared.data(for: request); try validate(response, data: data); return try JSONDecoder.lastCall.decode([MessageRow].self, from: data).first
