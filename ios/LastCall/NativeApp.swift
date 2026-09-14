@@ -112,7 +112,6 @@ enum NativeTab: String, CaseIterable { case home = "Home", discover = "Stories",
 
 struct NativeRootView: View {
     @EnvironmentObject private var model: NativeAppModel
-    @StateObject private var router = ConversationRouter.shared
     var body: some View {
         TabView(selection: $model.tab) {
             NativeHome().tag(NativeTab.home)
@@ -124,7 +123,6 @@ struct NativeRootView: View {
         .tint(Look.gold)
         .background(Look.black.ignoresSafeArea())
         .sheet(isPresented: $model.showAuth) { NativeAuth(mode: $model.authMode) }
-        .sheet(item: Binding(get: { router.openID.map { ConversationRow(id: $0, otherUser: ProfileRow(id: UUID(), publicName: "LAST CALL", bio: nil, anonymous: true, privacyMessages: "nobody"), status: "accepted", latestMessage: nil) } }, set: { if $0 == nil { router.openID = nil } })) { conversation in NativeChat(conversation: conversation) }
         .alert("LAST CALL", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) { Button("OK", role: .cancel) {} } message: { Text(model.error ?? "") }
     }
 }
