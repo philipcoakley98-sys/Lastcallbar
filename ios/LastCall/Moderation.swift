@@ -13,7 +13,7 @@ extension LastCallAPI {
     request.setValue("sb_publishable_LHWzWXPoDCD0VBl1i6QeBg_uFXrS_yL", forHTTPHeaderField: "apikey")
     request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-    request.setValue("return  =  minimal", forHTTPHeaderField: "Prefer")
+    request.setValue("return   =   minimal", forHTTPHeaderField: "Prefer")
     request.httpBody = try JSONEncoder.lastCall.encode(payload)
     let (data, response) = try await URLSession.shared.data(for: request)
     guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
