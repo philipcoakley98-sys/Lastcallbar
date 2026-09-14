@@ -26,5 +26,14 @@ replacement = '''func fetchCommentCounts(storyIDs: [UUID], accessToken: String?)
 '''
 api.write_text(text[:start] + replacement + text[end:])
 
+# Repair URL/query/header literals that were previously damaged by the old
+# spacing normalizer. Keep these exact because spaces change their semantics.
 for path in root.rglob("*.swift"):
-    path.write_text(path.read_text().replace("+ =", "+="))
+    source = path.read_text()
+    source = source.replace("return    =    minimal", "return=minimal")
+    source = source.replace("return    =    representation", "return=representation")
+    source = source.replace("count    =    exact", "count=exact")
+    source = source.replace("grant_type    =    password", "grant_type=password")
+    source = source.replace("grant_type    =    refresh_token", "grant_type=refresh_token")
+    source = source.replace("+ =", "+=")
+    path.write_text(source)
