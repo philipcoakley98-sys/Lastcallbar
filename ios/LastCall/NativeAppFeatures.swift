@@ -50,10 +50,3 @@ extension LastCallAPI {
         }
     }
 }
-
-// Shared routing helper used when Community starts a new conversation.
-extension ConversationRouter {
-    func open(_ id: UUID) {
-        openID = id
-    }
-}
