@@ -1,0 +1,71 @@
+name: Repair native app build
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  repair-and-build:
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Repair duplicate conversation presentation
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('ios/LastCall/NativeApp.swift')
+          s = p.read_text()
+          s = s.replace('    @StateObject private var router = ConversationRouter.shared\n', '')
+          old = '''        .sheet(item: Binding(get: { router.openID.map { ConversationRow(id: $0, otherUser: ProfileRow(id: UUID(), publicName: "LAST CALL", bio: nil, anonymous: true, privacyMessages: "nobody"), status: "accepted", latestMessage: nil) } }, set: { if $0 == nil { router.openID = nil } })) { conversation in NativeChat(conversation: conversation) }\n'''
+          s = s.replace(old, '')
+          p.write_text(s)
+          PY
+
+      - name: Commit repair if needed
+        shell: bash
+        run: |
+          if git diff --quiet -- ios/LastCall/NativeApp.swift; then
+            echo "No repair needed"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add ios/LastCall/NativeApp.swift
+            git commit -m "Fix native conversation sheet ownership"
+            git push
+          fi
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Build LAST CALL for iPhone Simulator
+        run: |
+          xcodebuild \
+            -project ios/LastCall.xcodeproj \
+            -scheme LastCall \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            -derivedDataPath build/DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build
+
+      - name: Package simulator app
+        run: |
+          cd build/DerivedData/Build/Products/Debug-iphonesimulator
+          ditto -c -k --sequesterRsrc --keepParent LastCall.app LastCall-Simulator.zip
+
+      - name: Upload simulator build
+        uses: actions/upload-artifact@v4
+        with:
+          name: LastCall-iPhone-Simulator
+          path: build/DerivedData/Build/Products/Debug-iphonesimulator/LastCall-Simulator.zip
+          if-no-files-found: error
