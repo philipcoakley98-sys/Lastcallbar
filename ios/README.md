@@ -37,8 +37,8 @@ The native app connects to the existing LAST CALL Supabase project using the pub
 
 Open `LastCall.xcodeproj` in Xcode and run the **LastCall** target on an iPhone simulator or device. Deployment target is iOS 17.
 
-The repository work is being completed independently of Xcode. Final simulator/device compilation, signing and TestFlight upload must be performed in Xcode on macOS. Apple currently requires Xcode 26 or later to build iOS apps for App Store Connect uploads. citeturn1search4
+The repository work is being completed independently of Xcode. Final simulator/device compilation, signing and TestFlight upload must be performed in Xcode on macOS.
 
-For external TestFlight distribution, Apple requires the first build to go through TestFlight App Review; after approval, testers can be invited by email or public link. citeturn1search0
+For external TestFlight distribution, the first build must go through TestFlight App Review; after approval, testers can be invited by email or public link.
 
 The web app remains at https://lastcallbar.co and continues to use the same Supabase data model.
