@@ -19,14 +19,11 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-
       - name: Show Xcode version
         run: xcodebuild -version
-
-      - name: Normalize Swift assignment spacing
+      - name: Normalize Swift spacing
         run: |
-          find ios/LastCall -name '*.swift' -print0 | xargs -0 perl -pi -e 's/(?<![=!<>-])=(?!=)/ = /g'
-
+          find ios/LastCall -name '*.swift' -print0 | xargs -0 perl -pi -e 's/(?<![=!<>-])=(?!=)/ = /g; s/\+\s+=/+=/g'
       - name: Format Swift sources
         run: |
           swift format -i $(find ios/LastCall -name '*.swift' -print)
@@ -37,41 +34,14 @@ jobs:
             git commit -m "chore: format Swift sources [skip ci]"
             git push
           fi
-
       - name: Build LAST CALL Debug for iPhone Simulator
-        run: |
-          xcodebuild \
-            -project ios/LastCall.xcodeproj \
-            -scheme LastCall \
-            -sdk iphonesimulator \
-            -configuration Debug \
-            -derivedDataPath build/DebugDerivedData \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            build
-
+        run: xcodebuild -project ios/LastCall.xcodeproj -scheme LastCall -sdk iphonesimulator -configuration Debug -derivedDataPath build/DebugDerivedData CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
       - name: Build LAST CALL Release for iPhone Simulator
-        run: |
-          xcodebuild \
-            -project ios/LastCall.xcodeproj \
-            -scheme LastCall \
-            -sdk iphonesimulator \
-            -configuration Release \
-            -derivedDataPath build/ReleaseDerivedData \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            build
-
+        run: xcodebuild -project ios/LastCall.xcodeproj -scheme LastCall -sdk iphonesimulator -configuration Release -derivedDataPath build/ReleaseDerivedData CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
       - name: Package Debug simulator app
-        run: |
-          cd build/DebugDerivedData/Build/Products/Debug-iphonesimulator
-          ditto -c -k --sequesterRsrc --keepParent LastCall.app LastCall-Debug-Simulator.zip
-
+        run: cd build/DebugDerivedData/Build/Products/Debug-iphonesimulator && ditto -c -k --sequesterRsrc --keepParent LastCall.app LastCall-Debug-Simulator.zip
       - name: Package Release simulator app
-        run: |
-          cd build/ReleaseDerivedData/Build/Products/Release-iphonesimulator
-          ditto -c -k --sequesterRsrc --keepParent LastCall.app LastCall-Release-Simulator.zip
-
+        run: cd build/ReleaseDerivedData/Build/Products/Release-iphonesimulator && ditto -c -k --sequesterRsrc --keepParent LastCall.app LastCall-Release-Simulator.zip
       - name: Upload simulator builds
         uses: actions/upload-artifact@v4
         with:
