@@ -23,6 +23,10 @@ jobs:
       - name: Show Xcode version
         run: xcodebuild -version
 
+      - name: Normalize Swift assignment spacing
+        run: |
+          find ios/LastCall -name '*.swift' -print0 | xargs -0 perl -pi -e 's/(?<![=!<>-])=(?!=)/ = /g'
+
       - name: Format Swift sources
         run: |
           swift format -i $(find ios/LastCall -name '*.swift' -print)
