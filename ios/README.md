@@ -34,11 +34,20 @@ The native app connects to the existing LAST CALL Supabase project using the pub
 - database-level privacy and blocking enforcement
 - `lastcall://` URL scheme reserved for future auth deep-link handling
 
+## Release readiness
+
+- Marketing version: **1.0.0**
+- Build number: **1**
+- Privacy manifest: `PrivacyInfo.xcprivacy`
+- Deployment target: **iOS 17**
+- Bundle identifier: `com.lastcall.app`
+- GitHub Actions macOS simulator build check: `.github/workflows/ios-build.yml`
+
 ## Project
 
-Open `LastCall.xcodeproj` in Xcode and run the **LastCall** target on an iPhone simulator or device. Deployment target is iOS 17.
+Open `LastCall.xcodeproj` in Xcode and run the **LastCall** target on an iPhone simulator or device.
 
-The repository work is being completed independently of Xcode. Final simulator/device compilation, signing and TestFlight upload must be performed in Xcode on macOS.
+The repository work is being completed independently of Xcode. The GitHub Actions workflow is configured to build an unsigned iPhone Simulator app on macOS. Final device compilation, signing and TestFlight upload still require Xcode on macOS and an active Apple Developer Program membership.
 
 For external TestFlight distribution, the first build must go through TestFlight App Review; after approval, testers can be invited by email or public link.
 
