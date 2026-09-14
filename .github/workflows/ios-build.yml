@@ -1,17 +1,12 @@
 name: iOS build check
-
 on:
   push:
-    paths:
-      - 'ios/**'
+    paths: ['ios/**']
   pull_request:
-    paths:
-      - 'ios/**'
+    paths: ['ios/**']
   workflow_dispatch:
-
 permissions:
   contents: write
-
 jobs:
   build:
     runs-on: macos-15
@@ -23,7 +18,8 @@ jobs:
         run: xcodebuild -version
       - name: Normalize Swift spacing
         run: |
-          find ios/LastCall -name '*.swift' -print0 | xargs -0 perl -pi -e 's/(?<![=!<>-])=(?!=)/ = /g; s/\+\s+=/+=/g'
+          find ios/LastCall -name '*.swift' -print0 | xargs -0 sed -i '' 's/+ =/+=/g'
+          find ios/LastCall -name '*.swift' -print0 | xargs -0 perl -pi -e 's/(?<![=!<>-])=(?!=)/ = /g'
       - name: Format Swift sources
         run: |
           swift format -i $(find ios/LastCall -name '*.swift' -print)
