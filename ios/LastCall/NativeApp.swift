@@ -1,169 +1,31 @@
 import SwiftUI
+import PhotosUI
+import UIKit
 
 enum AuthMode { case signIn, signUp }
-
-@main
-struct LastCallNativeApp: App {
-    @StateObject private var model = NativeAppModel()
-    var body: some Scene {
-        WindowGroup { NativeRootView().environmentObject(model).preferredColorScheme(.dark).task { await model.bootstrap() } }
-    }
+@main struct LastCallNativeApp:App{@StateObject private var model=NativeAppModel();var body:some Scene{WindowGroup{NativeRootView().environmentObject(model).preferredColorScheme(.dark).task{await model.bootstrap()}}}}
+@MainActor final class NativeAppModel:ObservableObject{
+ @Published var tab:NativeTab = .home;@Published var stories:[NativeStory]=[];@Published var signedIn=false;@Published var user:AuthUser?;@Published var token:String?;@Published var profile:ProfileRow?;@Published var unread=0;@Published var reactions=Set<UUID>();@Published var error:String?;@Published var authMode:AuthMode=.signIn;@Published var showAuth=false;@Published var refreshID=UUID()
+ var session:Bool{signedIn && user != nil && token != nil}
+ func bootstrap()async{if let a=await LastCallAPI.shared.restoreSession(),let t=a.accessToken,let u=a.user{token=t;user=u;signedIn=true;await refreshAccount()};await refreshStories()}
+ func refreshStories()async{do{let remote=try await LastCallAPI.shared.fetchPublishedStories();let ids=remote.map(\.id);let counts=(try? await LastCallAPI.shared.fetchReactionCounts(storyIDs:ids,accessToken:token ?? "")) ?? [:];let authorIDs=Array(Set(remote.compactMap(\.authorId)));let ps=(try? await LastCallAPI.shared.fetchProfiles(ids:authorIDs,accessToken:token ?? "")) ?? [];let byID=Dictionary(uniqueKeysWithValues:ps.map{($0.id,$0)});stories=remote.map{NativeStory(remote:$0,profile:$0.authorId.flatMap{byID[$0]},reactions:counts[$0.id] ?? 0)}}catch{error="Stories could not be refreshed just now."};refreshID=UUID()}
+ func refreshAccount()async{guard let t=token,let id=user?.id else{return};do{profile=try await LastCallAPI.shared.fetchProfile(userID:id,accessToken:t);reactions=try await LastCallAPI.shared.fetchReactionStoryIDs(userID:id,accessToken:t);unread=try await LastCallAPI.shared.fetchNotifications(userID:id,accessToken:t).filter{$0.readAt == nil}.count}catch{}}
+ func signIn(_ email:String,_ password:String)async{do{let a=try await LastCallAPI.shared.signIn(email:email.trimmingCharacters(in:.whitespacesAndNewlines),password:password);guard let t=a.accessToken,let u=a.user else{throw LastCallAPIError.server("Sign in did not return a session.")};token=t;user=u;signedIn=true;showAuth=false;await refreshAccount();await refreshStories()}catch{error=errorMessage(error)}}
+ func signUp(_ email:String,_ password:String,_ name:String)async{do{let a=try await LastCallAPI.shared.signUp(email:email.trimmingCharacters(in:.whitespacesAndNewlines),password:password,displayName:name.nilIfEmpty);if let t=a.accessToken,let u=a.user{token=t;user=u;signedIn=true;showAuth=false;await refreshAccount()}else{error="Account created. Check your email to confirm your address, then come back to LAST CALL and sign in."}}catch{error=errorMessage(error)}}
+ func signOut(){LastCallAPI.shared.signOut();token=nil;user=nil;profile=nil;signedIn=false;reactions=[];unread=0;tab=.home;stories=[]}
+ func react(_ story:NativeStory)async{guard let t=token,let id=user?.id else{authMode=.signIn;showAuth=true;return};do{let active=reactions.contains(story.id);_=try await LastCallAPI.shared.toggleBeerReaction(storyID:story.id,userID:id,accessToken:t,reacted:active);if active{reactions.remove(story.id)}else{reactions.insert(story.id)};await refreshStories()}catch{error="That reaction could not be saved."}}
+ func submit(title:String,body:String,category:String,city:String,country:String,anonymous:Bool,imageData:Data?)async->Bool{guard let t=token,let id=user?.id else{authMode=.signIn;showAuth=true;return false};do{var imageURL:URL?;if let imageData{guard let jpeg=UIImage(data:imageData)?.jpegData(compressionQuality:0.82)else{throw LastCallAPIError.server("That image could not be prepared.")};imageURL=try await LastCallAPI.shared.uploadStoryImage(jpeg:jpeg,userID:id,accessToken:t)};try await LastCallAPI.shared.insertStory(title:title,body:body,category:category,city:city,country:country,anonymous:anonymous,imageURL:imageURL,accessToken:t,userID:id);return true}catch{error="Your story could not be sent just now.";return false}}
+ private func errorMessage(_ e:Error)->String{let s=e.localizedDescription;if s.contains("Invalid login credentials"){return "That email or password was not recognised."};if s.contains("Email not confirmed"){return "Please confirm your email before signing in."};if s.lowercased().contains("already registered"){return "That email already has a LAST CALL account. Try signing in."};return s}
 }
-
-@MainActor
-final class NativeAppModel: ObservableObject {
-    @Published var tab: NativeTab = .home
-    @Published var stories: [NativeStory] = []
-    @Published var signedIn = false
-    @Published var user: AuthUser?
-    @Published var token: String?
-    @Published var profile: ProfileRow?
-    @Published var unread = 0
-    @Published var reactions = Set<UUID>()
-    @Published var error: String?
-    @Published var authMode: AuthMode = .signIn
-    @Published var showAuth = false
-    @Published var refreshID = UUID()
-    var session: Bool { signedIn && user != nil && token != nil }
-
-    func bootstrap() async {
-        if let auth = await LastCallAPI.shared.restoreSession(), let t = auth.accessToken, let u = auth.user {
-            token = t; user = u; signedIn = true; await refreshAccount()
-        }
-        await refreshStories()
-    }
-
-    func refreshStories() async {
-        do {
-            let remote = try await LastCallAPI.shared.fetchPublishedStories()
-            let ids = remote.map(\.id)
-            let counts = (try? await LastCallAPI.shared.fetchReactionCounts(storyIDs: ids, accessToken: token ?? "")) ?? [:]
-            let authorIDs = Array(Set(remote.compactMap(\.authorId)))
-            let profiles = (try? await LastCallAPI.shared.fetchProfiles(ids: authorIDs, accessToken: token ?? "")) ?? []
-            let byID = Dictionary(uniqueKeysWithValues: profiles.map { ($0.id, $0) })
-            stories = remote.map { NativeStory(remote: $0, profile: $0.authorId.flatMap { byID[$0] }, reactions: counts[$0.id] ?? 0) }
-        } catch {
-            error = "Stories could not be refreshed just now."
-        }
-        refreshID = UUID()
-    }
-
-    func refreshAccount() async {
-        guard let t = token, let id = user?.id else { return }
-        do {
-            profile = try await LastCallAPI.shared.fetchProfile(userID: id, accessToken: t)
-            reactions = try await LastCallAPI.shared.fetchReactionStoryIDs(userID: id, accessToken: t)
-            unread = try await LastCallAPI.shared.fetchNotifications(userID: id, accessToken: t).filter { $0.readAt == nil }.count
-        } catch { }
-    }
-
-    func signIn(_ email: String, _ password: String) async {
-        do {
-            let auth = try await LastCallAPI.shared.signIn(email: email.trimmingCharacters(in: .whitespacesAndNewlines), password: password)
-            guard let t = auth.accessToken, let u = auth.user else { throw LastCallAPIError.server("Sign in did not return a session.") }
-            token = t; user = u; signedIn = true; showAuth = false; await refreshAccount(); await refreshStories()
-        } catch { error = errorMessage(error) }
-    }
-
-    func signUp(_ email: String, _ password: String, _ name: String) async {
-        do {
-            let auth = try await LastCallAPI.shared.signUp(email: email.trimmingCharacters(in: .whitespacesAndNewlines), password: password, displayName: name.nilIfEmpty)
-            if let t = auth.accessToken, let u = auth.user { token = t; user = u; signedIn = true; showAuth = false; await refreshAccount() }
-            else { error = "Account created. Check your email to confirm your address, then come back to LAST CALL and sign in." }
-        } catch { error = errorMessage(error) }
-    }
-
-    func signOut() { LastCallAPI.shared.signOut(); token = nil; user = nil; profile = nil; signedIn = false; reactions = []; unread = 0; tab = .home; stories = [] }
-
-    func react(_ story: NativeStory) async {
-        guard let t = token, let id = user?.id else { authMode = .signIn; showAuth = true; return }
-        do {
-            let active = reactions.contains(story.id)
-            _ = try await LastCallAPI.shared.toggleBeerReaction(storyID: story.id, userID: id, accessToken: t, reacted: active)
-            if active { reactions.remove(story.id) } else { reactions.insert(story.id) }
-            await refreshStories()
-        } catch { error = "That reaction could not be saved." }
-    }
-
-    func submit(title: String, body: String, category: String, city: String, country: String, anonymous: Bool) async -> Bool {
-        guard let t = token, let id = user?.id else { authMode = .signIn; showAuth = true; return false }
-        do { try await LastCallAPI.shared.insertStory(title: title, body: body, category: category, city: city, country: country, anonymous: anonymous, accessToken: t, userID: id); return true }
-        catch { error = "Your story could not be sent just now."; return false }
-    }
-
-    private func errorMessage(_ e: Error) -> String {
-        let s = e.localizedDescription
-        if s.contains("Invalid login credentials") { return "That email or password was not recognised." }
-        if s.contains("Email not confirmed") { return "Please confirm your email before signing in." }
-        if s.lowercased().contains("already registered") { return "That email already has a LAST CALL account. Try signing in." }
-        return s
-    }
-}
-
-enum NativeTab: String, CaseIterable { case home = "Home", discover = "Explore", write = "Write", messages = "Messages", profile = "Profile" }
-
-struct NativeRootView: View {
-    @EnvironmentObject private var model: NativeAppModel
-    var body: some View {
-        Group {
-            if model.session {
-                TabView(selection: $model.tab) {
-                    CommunityHome().tag(NativeTab.home).tabItem { Label("Home", systemImage: "house.fill") }
-                    ExploreView().tag(NativeTab.discover).tabItem { Label("Explore", systemImage: "safari") }
-                    NativeWrite().tag(NativeTab.write).tabItem { Label("Write", systemImage: "plus.circle.fill") }
-                    LastCallMessages().tag(NativeTab.messages).tabItem { Label("Messages", systemImage: "message.fill") }
-                    NativeProfile().tag(NativeTab.profile).tabItem { Label("Profile", systemImage: "person.crop.circle") }
-                }.tint(Look.gold)
-            } else { LockedHome() }
-        }
-        .background(Look.black.ignoresSafeArea())
-        .sheet(isPresented: $model.showAuth) { NativeAuth(mode: $model.authMode) }
-        .alert("LAST CALL", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) { Button("OK", role: .cancel) {} } message: { Text(model.error ?? "") }
-    }
-}
-
-struct NativeStory: Identifiable, Hashable {
-    let id: UUID; let title: String; let body: String; let author: String; let location: String; let category: String; let reactions: Int; let comments: Int; let imageURL: URL?; let isSample: Bool
-    init(id: UUID = UUID(), title: String, body: String, author: String, location: String, category: String, reactions: Int, comments: Int, imageURL: URL?, isSample: Bool = false) { self.id=id; self.title=title; self.body=body; self.author=author; self.location=location; self.category=category; self.reactions=reactions; self.comments=comments; self.imageURL=imageURL; self.isSample=isSample }
-    init(remote: RemoteStory, profile: ProfileRow?, reactions: Int) {
-        let anonymous = remote.anonymousName
-        self.init(id: remote.id, title: remote.title, body: remote.body, author: anonymous ?? profile?.publicName ?? "LAST CALL member", location: remote.location.isEmpty ? "Worldwide" : remote.location, category: remote.category, reactions: reactions, comments: 0, imageURL: profile.flatMap { URL(string: $0.avatarURL ?? "") })
-    }
-}
-
-struct NativeHeader: View {
-    @EnvironmentObject private var model: NativeAppModel
-    var body: some View {
-        HStack {
-            Text("LAST CALL").font(.system(size: 15, weight: .bold, design: .serif)).tracking(2.4)
-            Spacer()
-            Button { model.tab = .discover } label: { Image(systemName: "magnifyingglass") }
-            if model.session {
-                Button { model.tab = .profile } label: {
-                    if let avatar = model.profile?.avatarURL, let url = URL(string: avatar), !avatar.isEmpty { AsyncImage(url: url) { phase in if case .success(let image) = phase { image.resizable().scaledToFill() } else { LastCallAvatar() } }.frame(width: 27, height: 27).clipShape(Circle()) }
-                    else { LastCallAvatar().frame(width: 27, height: 27).clipShape(Circle()) }
-                }
-            }
-        }.foregroundStyle(Look.cream).padding(.top, 6)
-    }
-}
-
-struct NativeWrite: View {
-    @EnvironmentObject private var model: NativeAppModel
-    @State private var title=""; @State private var bodyText=""; @State private var category="Closing Time"; @State private var city=""; @State private var country=""; @State private var anonymous=true; @State private var sending=false; @State private var done=false
-    let categories=["Closing Time","After Hours","Bar Wisdom","Staff Hours"]
-    var body: some View { NavigationStack { ScrollView { VStack(alignment:.leading,spacing:12) { Text("Tell us your story").font(.system(size:31,weight:.bold,design:.serif)); Text("Funny, strange, heartwarming, unforgettable — whatever stayed with you.").font(.system(size:12,design:.serif)).foregroundStyle(Look.muted); TextField("Story title",text:$title).textFieldStyle(LCField()); TextEditor(text:$bodyText).frame(minHeight:230).scrollContentBackground(.hidden).padding(8).background(Look.card).clipShape(RoundedRectangle(cornerRadius:10)).overlay(RoundedRectangle(cornerRadius:10).stroke(Look.line)); Picker("Category",selection:$category){ForEach(categories,id:\.self,content:Text.init)}.pickerStyle(.menu); HStack{TextField("City",text:$city).textFieldStyle(LCField());TextField("Country",text:$country).textFieldStyle(LCField())}; Toggle("Post anonymously",isOn:$anonymous).tint(Look.green); Button(sending ? "SENDING…":"SUBMIT STORY →"){sending=true;Task{let ok=await model.submit(title:title,body:bodyText,category:category,city:city,country:country,anonymous:anonymous);sending=false;if ok{done=true;title="";bodyText="";city="";country=""}}}.buttonStyle(PrimaryButton()).disabled(sending || bodyText.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty);if done{Text("Thanks — your story has been sent for review.").font(.system(size:9,weight:.semibold)).foregroundStyle(Look.gold)}}.padding(13)}.background(Look.black.ignoresSafeArea()).foregroundStyle(Look.cream).navigationBarHidden(true)}}
-}
-
-struct NativeAuth: View {
-    @EnvironmentObject private var model: NativeAppModel; @Binding var mode:AuthMode; @State private var email=""; @State private var password=""; @State private var name=""; @State private var working=false; @Environment(\.dismiss) private var dismiss
-    var body: some View { NavigationStack { ScrollView { VStack(alignment:.leading,spacing:12) { Text(mode == .signIn ? "Welcome back":"Become a free member").font(.system(size:30,weight:.bold,design:.serif)); if mode == .signUp { TextField("Name or display name (optional)",text:$name).textFieldStyle(LCField()) }; TextField("Email",text:$email).textFieldStyle(LCField()).textInputAutocapitalization(.never).keyboardType(.emailAddress).autocorrectionDisabled(); SecureField("Password",text:$password).textFieldStyle(LCField()); Button(working ? "PLEASE WAIT…":(mode == .signIn ? "SIGN IN →":"CREATE FREE ACCOUNT →")){working=true;Task{if mode == .signIn{await model.signIn(email,password)}else{await model.signUp(email,password,name)};working=false}}.buttonStyle(PrimaryButton()).disabled(working || email.isEmpty || password.count < 6); Button(mode == .signIn ? "Need an account? Become a free member":"Already a member? Sign in"){mode=mode == .signIn ? .signUp:.signIn}.foregroundStyle(Look.gold)}.padding(13)}.background(Look.black.ignoresSafeArea()).foregroundStyle(Look.cream).toolbar{ToolbarItem(placement:.topBarLeading){Button("Close"){dismiss()}}}}}
-}
-
-struct NativeImage: View {
-    let url: URL?
-    var body: some View { AsyncImage(url:url){phase in switch phase { case .success(let image): image.resizable().scaledToFill(); default: ZStack { Look.card.ignoresSafeArea(); LastCallAvatar().padding(22) } } }.clipped() }
-}
+enum NativeTab:String,CaseIterable{case home="Home",discover="Explore",write="Write",messages="Messages",profile="Profile"}
+struct NativeRootView:View{@EnvironmentObject private var model:NativeAppModel;var body:some View{Group{if model.session{TabView(selection:$model.tab){CommunityHome().tag(NativeTab.home).tabItem{Label("Home",systemImage:"house.fill")};ExploreView().tag(NativeTab.discover).tabItem{Label("Explore",systemImage:"safari")};NativeWrite().tag(NativeTab.write).tabItem{Label("Write",systemImage:"plus.circle.fill")};LastCallMessages().tag(NativeTab.messages).tabItem{Label("Messages",systemImage:"message.fill")};NativeProfile().tag(NativeTab.profile).tabItem{Label("Profile",systemImage:"person.crop.circle")}}.tint(Look.gold)}else{LockedHome()}}.background(Look.black.ignoresSafeArea()).sheet(isPresented:$model.showAuth){NativeAuth(mode:$model.authMode)}.alert("LAST CALL",isPresented:Binding(get:{model.error != nil},set:{if !$0{model.error=nil}})){Button("OK",role:.cancel){}}message:{Text(model.error ?? "")}}}
+struct NativeStory:Identifiable,Hashable{let id:UUID;let title:String;let body:String;let author:String;let authorAvatarURL:URL?;let location:String;let category:String;let reactions:Int;let comments:Int;let imageURL:URL?;let isSample:Bool;init(id:UUID=UUID(),title:String,body:String,author:String,authorAvatarURL:URL?,location:String,category:String,reactions:Int,comments:Int,imageURL:URL?,isSample:Bool=false){self.id=id;self.title=title;self.body=body;self.author=author;self.authorAvatarURL=authorAvatarURL;self.location=location;self.category=category;self.reactions=reactions;self.comments=comments;self.imageURL=imageURL;self.isSample=isSample}
+ init(remote:RemoteStory,profile:ProfileRow?,reactions:Int){self.init(id:remote.id,title:remote.title,body:remote.body,author:remote.anonymousName ?? profile?.publicName ?? "LAST CALL member",authorAvatarURL:profile.flatMap{$0.avatarURL}.flatMap(URL.init),location:remote.location.isEmpty ? "Worldwide":remote.location,category:remote.category,reactions:reactions,comments:0,imageURL:remote.imageURL.flatMap(URL.init))}}
+struct NativeHeader:View{@EnvironmentObject private var model:NativeAppModel;var body:some View{HStack{Text("LAST CALL").font(.system(size:15,weight:.bold,design:.serif)).tracking(2.4);Spacer();Button{model.tab=.discover}label:{Image(systemName:"magnifyingglass")};if model.session{Button{model.tab=.profile}label:{ProfileAvatar(profile:model.profile,size:27)}}}.foregroundStyle(Look.cream).padding(.top,6)}}
+struct NativeWrite:View{@EnvironmentObject private var model:NativeAppModel;@State private var title="";@State private var bodyText="";@State private var category="Closing Time";@State private var city="";@State private var country="";@State private var anonymous=true;@State private var sending=false;@State private var done=false;@State private var photo:PhotosPickerItem?;@State private var imageData:Data?;let categories=["Closing Time","After Hours","Bar Wisdom","Staff Hours"]
+ var body:some View{NavigationStack{ScrollView{VStack(alignment:.leading,spacing:12){Text("Tell us your story").font(.system(size:31,weight:.bold,design:.serif));Text("Funny, strange, heartwarming, unforgettable — whatever stayed with you.").font(.system(size:12,design:.serif)).foregroundStyle(Look.muted);TextField("Story title",text:$title).textFieldStyle(LCField());TextEditor(text:$bodyText).frame(minHeight:230).scrollContentBackground(.hidden).padding(8).background(Look.card).clipShape(RoundedRectangle(cornerRadius:10)).overlay(RoundedRectangle(cornerRadius:10).stroke(Look.line));Picker("Category",selection:$category){ForEach(categories,id:\.self,content:Text.init)}.pickerStyle(.menu);HStack{TextField("City",text:$city).textFieldStyle(LCField());TextField("Country",text:$country).textFieldStyle(LCField())};Toggle("Post anonymously",isOn:$anonymous).tint(Look.green);PhotosPicker(selection:$photo,matching:.images){HStack{Image(systemName:"photo");Text(imageData == nil ? "ADD STORY PHOTO":"PHOTO READY")}.font(.system(size:9,weight:.bold)).foregroundStyle(Look.gold).padding(11).frame(maxWidth:.infinity).background(Look.card).clipShape(RoundedRectangle(cornerRadius:9))}.onChange(of:photo){_,newItem in guard let newItem else{return};Task{imageData=try? await newItem.loadTransferable(type:Data.self)}};if let imageData,let image=UIImage(data:imageData){Image(uiImage:image).resizable().scaledToFill().frame(height:180).clipShape(RoundedRectangle(cornerRadius:12))};Button(sending ? "SENDING…":"SUBMIT STORY →"){sending=true;Task{let ok=await model.submit(title:title,body:bodyText,category:category,city:city,country:country,anonymous:anonymous,imageData:imageData);sending=false;if ok{done=true;title="";bodyText="";city="";country="";imageData=nil;photo=nil}}}.buttonStyle(PrimaryButton()).disabled(sending || bodyText.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty);if done{Text("Thanks — your story has been sent for review.").font(.system(size:9,weight:.semibold)).foregroundStyle(Look.gold)}}.padding(13)}.background(Look.black.ignoresSafeArea()).foregroundStyle(Look.cream).navigationBarHidden(true)}}}
+struct NativeAuth:View{@EnvironmentObject private var model:NativeAppModel;@Binding var mode:AuthMode;@State private var email="";@State private var password="";@State private var name="";@State private var working=false;@Environment(\.dismiss)private var dismiss;var body:some View{NavigationStack{ScrollView{VStack(alignment:.leading,spacing:12){Text(mode == .signIn ? "Welcome back":"Become a free member").font(.system(size:30,weight:.bold,design:.serif));if mode == .signUp{TextField("Name or display name (optional)",text:$name).textFieldStyle(LCField())};TextField("Email",text:$email).textFieldStyle(LCField()).textInputAutocapitalization(.never).keyboardType(.emailAddress).autocorrectionDisabled();SecureField("Password",text:$password).textFieldStyle(LCField());Button(working ? "PLEASE WAIT…":(mode == .signIn ? "SIGN IN →":"CREATE FREE ACCOUNT →")){working=true;Task{if mode == .signIn{await model.signIn(email,password)}else{await model.signUp(email,password,name)};working=false}}.buttonStyle(PrimaryButton()).disabled(working || email.isEmpty || password.count<6);Button(mode == .signIn ? "Need an account? Become a free member":"Already a member? Sign in"){mode=mode == .signIn ? .signUp:.signIn}.foregroundStyle(Look.gold)}.padding(13)}.background(Look.black.ignoresSafeArea()).foregroundStyle(Look.cream).toolbar{ToolbarItem(placement:.topBarLeading){Button("Close"){dismiss()}}}}}
+struct NativeImage:View{let url:URL?;var body:some View{AsyncImage(url:url){phase in switch phase{case .success(let image):image.resizable().scaledToFill();default:ZStack{Look.card.ignoresSafeArea();LastCallAvatar().padding(22)}}}.clipped()}}
 struct PrimaryButton:ButtonStyle{func makeBody(configuration:Configuration)->some View{configuration.label.font(.system(size:8,weight:.bold)).tracking(1).foregroundStyle(Look.black).padding(.horizontal,13).padding(.vertical,9).background(Look.gold).clipShape(RoundedRectangle(cornerRadius:7)).opacity(configuration.isPressed ? 0.75:1)}}
 struct OutlineButton:ButtonStyle{func makeBody(configuration:Configuration)->some View{configuration.label.font(.system(size:7,weight:.bold)).tracking(0.8).foregroundStyle(Look.gold).padding(.horizontal,9).padding(.vertical,7).background(Look.card).clipShape(RoundedRectangle(cornerRadius:7)).overlay(RoundedRectangle(cornerRadius:7).stroke(Look.gold.opacity(0.35))).opacity(configuration.isPressed ? 0.7:1)}}
 struct LCField:TextFieldStyle{func _body(configuration:TextField<Self._Label>)->some View{configuration.padding(11).background(Look.card).foregroundStyle(Look.cream).clipShape(RoundedRectangle(cornerRadius:8)).overlay(RoundedRectangle(cornerRadius:8).stroke(Look.line))}}
