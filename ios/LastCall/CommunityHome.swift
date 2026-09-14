@@ -40,10 +40,10 @@ struct CommunityHome: View {
     private var topBar: some View {
         HStack(spacing: 12) {
             Button { model.tab = .profile } label: {
-                Circle()
-                    .fill(Look.green)
+                LastCallAvatar()
                     .frame(width: 38, height: 38)
-                    .overlay(Text("LC").font(.system(size: 8, weight: .bold)))
+                    .clipShape(Circle())
+                    .overlay(Circle().stroke(Look.gold, lineWidth: 1))
             }
             Spacer()
             VStack(spacing: 1) {
@@ -113,8 +113,9 @@ struct CommunityHome: View {
 
     private var composer: some View {
         HStack(spacing: 10) {
-            Circle().fill(Look.green).frame(width: 40, height: 40)
-                .overlay(Text("LC").font(.system(size: 8, weight: .bold)))
+            LastCallAvatar()
+                .frame(width: 40, height: 40)
+                .clipShape(Circle())
             Text("What's on your mind?")
                 .font(.system(size: 14))
                 .foregroundStyle(Look.muted)
@@ -165,8 +166,9 @@ private struct CommunityPost: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 9) {
-                Circle().fill(Look.green).frame(width: 39, height: 39)
-                    .overlay(Text("LC").font(.system(size: 8, weight: .bold)))
+                LastCallAvatar()
+                    .frame(width: 39, height: 39)
+                    .clipShape(Circle())
                 VStack(alignment: .leading, spacing: 2) {
                     Text(story.author == "SAMPLE" ? "Conor_Mc" : story.author)
                         .font(.system(size: 12, weight: .semibold))
