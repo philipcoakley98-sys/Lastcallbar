@@ -43,12 +43,19 @@ final class NativeAppModel: ObservableObject {
     func refreshStories() async {
         do {
             let remote = try await LastCallAPI.shared.fetchPublishedStories()
-            if !remote.isEmpty {
+            if remote.isEmpty {
+                // An empty production feed is a valid state. Never leave demo stories
+                // visible after a successful empty response.
+                stories = []
+            } else {
                 let ids = remote.map(\.id)
                 let counts = (try? await LastCallAPI.shared.fetchReactionCounts(storyIDs: ids, accessToken: token ?? "")) ?? [:]
                 stories = remote.map { NativeStory(remote: $0, reactions: counts[$0.id] ?? 0) }
             }
-        } catch { self.error = "Stories could not be refreshed just now." }
+        } catch {
+            // Keep clearly-labelled sample content as a graceful offline/demo fallback.
+            self.error = "Stories could not be refreshed just now."
+        }
         refreshID = UUID()
     }
 
@@ -150,7 +157,11 @@ struct NativeHome: View {
                     NativeHero()
                     if let story = model.stories.first { NativeFeature(story: story) { selected = story } }
                     HStack { Text("TOP STORIES").font(.system(size: 18, weight: .bold, design: .serif)); Spacer(); Text("SEE ALL").font(.system(size: 7, weight: .bold)).foregroundStyle(Look.gold) }.foregroundStyle(Look.cream)
-                    ForEach(model.stories.prefix(5)) { story in NativeStoryRow(story: story) { selected = story } }
+                    if model.stories.isEmpty {
+                        Text("No published stories yet. If you’ve got a story, we’d love to hear it.").font(.system(size: 11, design: .serif)).foregroundStyle(Look.muted).frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 10)
+                    } else {
+                        ForEach(model.stories.prefix(5)) { story in NativeStoryRow(story: story) { selected = story } }
+                    }
                     NativeCategories()
                 }.padding(.horizontal, 13).padding(.bottom, 24)
             }.background(Look.black.ignoresSafeArea()).navigationBarHidden(true).refreshable { await model.refreshStories() }.sheet(item: $selected) { NativeStoryDetail(story: $0) }
@@ -187,7 +198,7 @@ struct NativeCategories: View { let names = ["Closing Time", "After Hours", "Bar
 struct NativeDiscover: View {
     @EnvironmentObject private var model: NativeAppModel; @State private var query = ""; @State private var selected: NativeStory?
     var filtered: [NativeStory] { query.isEmpty ? model.stories : model.stories.filter { $0.title.localizedCaseInsensitiveContains(query) || $0.body.localizedCaseInsensitiveContains(query) || $0.category.localizedCaseInsensitiveContains(query) || $0.location.localizedCaseInsensitiveContains(query) } }
-    var body: some View { NavigationStack { ScrollView { VStack(alignment: .leading, spacing: 12) { Text("Stories").font(.system(size: 31, weight: .bold, design: .serif)); TextField("Search stories, cities or categories", text: $query).textFieldStyle(LCField()); ForEach(filtered) { story in NativeStoryRow(story: story) { selected = story } } }.padding(13) }.background(Look.black.ignoresSafeArea()).foregroundStyle(Look.cream).navigationBarHidden(true).sheet(item: $selected) { NativeStoryDetail(story: $0) } } }
+    var body: some View { NavigationStack { ScrollView { VStack(alignment: .leading, spacing: 12) { Text("Stories").font(.system(size: 31, weight: .bold, design: .serif)); TextField("Search stories, cities or categories", text: $query).textFieldStyle(LCField()); if filtered.isEmpty { Text(query.isEmpty ? "No published stories yet." : "No stories matched that search.").font(.system(size: 11, design: .serif)).foregroundStyle(Look.muted).padding(.vertical, 18) } else { ForEach(filtered) { story in NativeStoryRow(story: story) { selected = story } } } }.padding(13) }.background(Look.black.ignoresSafeArea()).foregroundStyle(Look.cream).navigationBarHidden(true).sheet(item: $selected) { NativeStoryDetail(story: $0) } } }
 }
 
 struct NativeStoryDetail: View {
