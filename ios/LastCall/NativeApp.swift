@@ -44,8 +44,6 @@ final class NativeAppModel: ObservableObject {
         do {
             let remote = try await LastCallAPI.shared.fetchPublishedStories()
             if remote.isEmpty {
-                // An empty production feed is a valid state. Never leave demo stories
-                // visible after a successful empty response.
                 stories = []
             } else {
                 let ids = remote.map(\.id)
@@ -53,7 +51,6 @@ final class NativeAppModel: ObservableObject {
                 stories = remote.map { NativeStory(remote: $0, reactions: counts[$0.id] ?? 0) }
             }
         } catch {
-            // Keep clearly-labelled sample content as a graceful offline/demo fallback.
             self.error = "Stories could not be refreshed just now."
         }
         refreshID = UUID()
@@ -115,19 +112,35 @@ final class NativeAppModel: ObservableObject {
     }
 }
 
-enum NativeTab: String, CaseIterable { case home = "Home", discover = "Stories", write = "Write", messages = "Messages", profile = "Profile" }
+enum NativeTab: String, CaseIterable { case home = "Home", discover = "Explore", write = "Write", messages = "Messages", profile = "Profile" }
 
 struct NativeRootView: View {
     @EnvironmentObject private var model: NativeAppModel
     var body: some View {
-        TabView(selection: $model.tab) {
-            LockedHome().tag(NativeTab.home)
-            NativeDiscover().tag(NativeTab.discover)
-            NativeWrite().tag(NativeTab.write)
-            NativeMessages().tag(NativeTab.messages)
-            NativeProfile().tag(NativeTab.profile)
+        Group {
+            if model.session {
+                TabView(selection: $model.tab) {
+                    CommunityHome()
+                        .tag(NativeTab.home)
+                        .tabItem { Label("Home", systemImage: "house.fill") }
+                    NativeDiscover()
+                        .tag(NativeTab.discover)
+                        .tabItem { Label("Explore", systemImage: "safari") }
+                    NativeWrite()
+                        .tag(NativeTab.write)
+                        .tabItem { Label("Write", systemImage: "plus.circle.fill") }
+                    NativeMessages()
+                        .tag(NativeTab.messages)
+                        .tabItem { Label("Messages", systemImage: "message.fill") }
+                    NativeProfile()
+                        .tag(NativeTab.profile)
+                        .tabItem { Label("Profile", systemImage: "person.crop.circle") }
+                }
+                .tint(Look.gold)
+            } else {
+                LockedHome()
+            }
         }
-        .tint(Look.gold)
         .background(Look.black.ignoresSafeArea())
         .sheet(isPresented: $model.showAuth) { NativeAuth(mode: $model.authMode) }
         .alert("LAST CALL", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) { Button("OK", role: .cancel) {} } message: { Text(model.error ?? "") }
