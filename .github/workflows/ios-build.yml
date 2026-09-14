@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -22,6 +22,17 @@ jobs:
 
       - name: Show Xcode version
         run: xcodebuild -version
+
+      - name: Format Swift sources
+        run: |
+          swift format -i $(find ios/LastCall -name '*.swift' -print)
+          if ! git diff --quiet -- ios/LastCall; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add ios/LastCall
+            git commit -m "chore: format Swift sources [skip ci]"
+            git push
+          fi
 
       - name: Build LAST CALL Debug for iPhone Simulator
         run: |
