@@ -25,7 +25,7 @@ jobs:
               text = text.replace('+ =', '+=')
               path.write_text(text)
           PY
-          find ios/LastCall -name '*.swift' -print0 | xargs -0 perl -pi -e 's/(?<![=!<>-])=(?!=)/ = /g'
+          find ios/LastCall -name '*.swift' -print0 | xargs -0 perl -pi -e 's/(?<![+\-=!<>])=(?!=)/ = /g'
       - name: Format Swift sources
         run: |
           swift format -i $(find ios/LastCall -name '*.swift' -print)
