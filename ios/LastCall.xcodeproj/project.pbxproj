@@ -5,20 +5,23 @@
  objectVersion = 56;
  objects = {
 /* Begin PBXBuildFile section */
-  A10000010000000000000001 /* LastCallApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000020000000000000001 /* LastCallApp.swift */; };
+  A10000010000000000000003 /* NativeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000020000000000000003 /* NativeApp.swift */; };
   A10000010000000000000002 /* SupabaseAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000020000000000000002 /* SupabaseAPI.swift */; };
+  A10000010000000000000004 /* NativeAppFeatures.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000020000000000000004 /* NativeAppFeatures.swift */; };
 /* End PBXBuildFile section */
 /* Begin PBXFileReference section */
   A10000030000000000000001 /* LastCall.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LastCall.app; sourceTree = BUILT_PRODUCTS_DIR; };
   A10000020000000000000001 /* LastCallApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LastCallApp.swift; sourceTree = "<group>"; };
   A10000020000000000000002 /* SupabaseAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseAPI.swift; sourceTree = "<group>"; };
+  A10000020000000000000003 /* NativeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeApp.swift; sourceTree = "<group>"; };
+  A10000020000000000000004 /* NativeAppFeatures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeAppFeatures.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 /* Begin PBXFrameworksBuildPhase section */
   A10000040000000000000001 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXFrameworksBuildPhase section */
 /* Begin PBXGroup section */
   A10000050000000000000001 = {isa = PBXGroup; children = (A10000060000000000000001 /* LastCall */, A10000070000000000000001 /* Products */); sourceTree = "<group>"; };
-  A10000060000000000000001 /* LastCall */ = {isa = PBXGroup; children = (A10000020000000000000001 /* LastCallApp.swift */, A10000020000000000000002 /* SupabaseAPI.swift */); path = LastCall; sourceTree = "<group>"; };
+  A10000060000000000000001 /* LastCall */ = {isa = PBXGroup; children = (A10000020000000000000003 /* NativeApp.swift */, A10000020000000000000002 /* SupabaseAPI.swift */, A10000020000000000000004 /* NativeAppFeatures.swift */, A10000020000000000000001 /* LastCallApp.swift */); path = LastCall; sourceTree = "<group>"; };
   A10000070000000000000001 /* Products */ = {isa = PBXGroup; children = (A10000030000000000000001 /* LastCall.app */); name = Products; sourceTree = "<group>"; };
 /* End PBXGroup section */
 /* Begin PBXNativeTarget section */
@@ -31,7 +34,7 @@
   A10000120000000000000001 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXResourcesBuildPhase section */
 /* Begin PBXSourcesBuildPhase section */
-  A10000110000000000000001 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A10000010000000000000001 /* LastCallApp.swift in Sources */, A10000010000000000000002 /* SupabaseAPI.swift in Sources */); runOnlyForDeploymentPostprocessing = 0; };
+  A10000110000000000000001 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A10000010000000000000003 /* NativeApp.swift in Sources */, A10000010000000000000002 /* SupabaseAPI.swift in Sources */, A10000010000000000000004 /* NativeAppFeatures.swift in Sources */); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXSourcesBuildPhase section */
 /* Begin XCBuildConfiguration section */
   A10000140000000000000001 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_MODULES = YES; CURRENT_PROJECT_VERSION = 1; GENERATE_INFOPLIST_FILE = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.0; PRODUCT_BUNDLE_IDENTIFIER = com.lastcall.app; PRODUCT_NAME = "$(TARGET_NAME)"; SDKROOT = iphoneos; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1"; } ; name = Debug; };
