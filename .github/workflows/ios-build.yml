@@ -15,7 +15,7 @@ permissions:
 jobs:
   build:
     runs-on: macos-15
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -23,26 +23,45 @@ jobs:
       - name: Show Xcode version
         run: xcodebuild -version
 
-      - name: Build LAST CALL for iPhone Simulator
+      - name: Build LAST CALL Debug for iPhone Simulator
         run: |
           xcodebuild \
             -project ios/LastCall.xcodeproj \
             -scheme LastCall \
             -sdk iphonesimulator \
             -configuration Debug \
-            -derivedDataPath build/DerivedData \
+            -derivedDataPath build/DebugDerivedData \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             build
 
-      - name: Package simulator app
+      - name: Build LAST CALL Release for iPhone Simulator
         run: |
-          cd build/DerivedData/Build/Products/Debug-iphonesimulator
-          ditto -c -k --sequesterRsrc --keepParent LastCall.app LastCall-Simulator.zip
+          xcodebuild \
+            -project ios/LastCall.xcodeproj \
+            -scheme LastCall \
+            -sdk iphonesimulator \
+            -configuration Release \
+            -derivedDataPath build/ReleaseDerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build
 
-      - name: Upload simulator build
+      - name: Package Debug simulator app
+        run: |
+          cd build/DebugDerivedData/Build/Products/Debug-iphonesimulator
+          ditto -c -k --sequesterRsrc --keepParent LastCall.app LastCall-Debug-Simulator.zip
+
+      - name: Package Release simulator app
+        run: |
+          cd build/ReleaseDerivedData/Build/Products/Release-iphonesimulator
+          ditto -c -k --sequesterRsrc --keepParent LastCall.app LastCall-Release-Simulator.zip
+
+      - name: Upload simulator builds
         uses: actions/upload-artifact@v4
         with:
-          name: LastCall-iPhone-Simulator
-          path: build/DerivedData/Build/Products/Debug-iphonesimulator/LastCall-Simulator.zip
+          name: LastCall-iPhone-Simulator-Builds
+          path: |
+            build/DebugDerivedData/Build/Products/Debug-iphonesimulator/LastCall-Debug-Simulator.zip
+            build/ReleaseDerivedData/Build/Products/Release-iphonesimulator/LastCall-Release-Simulator.zip
           if-no-files-found: error
