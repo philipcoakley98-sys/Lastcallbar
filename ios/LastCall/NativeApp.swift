@@ -106,22 +106,23 @@ final class NativeAppModel: ObservableObject {
     }
 }
 
-enum NativeTab: String, CaseIterable { case home = "Home", discover = "Stories", write = "Write", community = "People", messages = "Messages", profile = "Profile" }
+enum NativeTab: String, CaseIterable { case home = "Home", discover = "Stories", write = "Write", messages = "Messages", profile = "Profile" }
 
 struct NativeRootView: View {
     @EnvironmentObject private var model: NativeAppModel
+    @StateObject private var router = ConversationRouter.shared
     var body: some View {
         TabView(selection: $model.tab) {
             NativeHome().tag(NativeTab.home)
             NativeDiscover().tag(NativeTab.discover)
             NativeWrite().tag(NativeTab.write)
-            NativeCommunity().tag(NativeTab.community)
             NativeMessages().tag(NativeTab.messages)
             NativeProfile().tag(NativeTab.profile)
         }
         .tint(Look.gold)
         .background(Look.black.ignoresSafeArea())
         .sheet(isPresented: $model.showAuth) { NativeAuth(mode: $model.authMode) }
+        .sheet(item: Binding(get: { router.openID.map { ConversationRow(id: $0, otherUser: ProfileRow(id: UUID(), publicName: "LAST CALL", bio: nil, anonymous: true, privacyMessages: "nobody"), status: "accepted", latestMessage: nil) } }, set: { if $0 == nil { router.openID = nil } })) { conversation in NativeChat(conversation: conversation) }
         .alert("LAST CALL", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) { Button("OK", role: .cancel) {} } message: { Text(model.error ?? "") }
     }
 }
@@ -221,7 +222,8 @@ struct NewConversationSheet: View {
 
 struct NativeMessages: View {
     @EnvironmentObject private var model: NativeAppModel; @State private var conversations: [ConversationRow] = []; @State private var selected: ConversationRow?; @StateObject private var router = ConversationRouter.shared
-    var body: some View { NavigationStack { Group { if !model.session { VStack(spacing: 12) { Text("Messages").font(.system(size: 27, weight: .bold, design: .serif)); Text("Sign in to message other LAST CALL members.").font(.system(size: 11)).foregroundStyle(Look.muted); Button("SIGN IN →") { model.authMode = .signIn; model.showAuth = true }.buttonStyle(PrimaryButton()) } } else { List(conversations) { c in Button { selected = c } label: { HStack { Circle().fill(Look.green).frame(width: 38).overlay(Text("LC").font(.system(size: 8, weight: .bold))); VStack(alignment: .leading) { Text(c.otherUser.publicName).font(.system(size: 11, weight: .semibold)); Text(c.latestMessage?.body ?? (c.status == "pending" ? "Message request" : "Start the conversation")).font(.system(size: 8)).foregroundStyle(Look.muted).lineLimit(1) }; Spacer(); if c.status == "pending" { Text("REQUEST").font(.system(size: 6, weight: .bold)).foregroundStyle(Look.gold) } } } } .scrollContentBackground(.hidden) } }.background(Look.black).foregroundStyle(Look.cream).navigationTitle("Messages").toolbar { if model.session { ToolbarItem(placement: .topBarTrailing) { Button("People") { model.tab = .community }.font(.system(size: 8, weight: .bold)) } } }.task { await load() }.onChange(of: router.openID) { _, id in if let id { Task { await load(); selected = conversations.first(where: { $0.id == id }) } } }.sheet(item: $selected) { NativeChat(conversation: $0) } } }
+    var body: some View { NavigationStack { Group { if !model.session { VStack(spacing: 12) { Text("Messages").font(.system(size: 27, weight: .bold, design: .serif)); Text("Sign in to message other LAST CALL members.").font(.system(size: 11)).foregroundStyle(Look.muted); Button("SIGN IN →") { model.authMode = .signIn; model.showAuth = true }.buttonStyle(PrimaryButton()) } } else { List(conversations) { c in Button { selected = c } label: { HStack { Circle().fill(Look.green).frame(width: 38).overlay(Text("LC").font(.system(size: 8, weight: .bold))); VStack(alignment: .leading) { Text(c.otherUser.publicName).font(.system(size: 11, weight: .semibold)); Text(c.latestMessage?.body ?? (c.status == "pending" ? "Message request" : "Start the conversation")).font(.system(size: 8)).foregroundStyle(Look.muted).lineLimit(1) }; Spacer(); if c.status == "pending" { Text("REQUEST").font(.system(size: 6, weight: .bold)).foregroundStyle(Look.gold) } } } } .scrollContentBackground(.hidden) } }.background(Look.black).foregroundStyle(Look.cream).navigationTitle("Messages").toolbar { if model.session { ToolbarItem(placement: .topBarTrailing) { Button("People") { showPeople = true }.font(.system(size: 8, weight: .bold)) } } }.task { await load() }.onChange(of: router.openID) { _, id in if let id { Task { await load(); selected = conversations.first(where: { $0.id == id }) } } }.sheet(item: $selected) { NativeChat(conversation: $0) }.sheet(isPresented: $showPeople) { NativeCommunity() } } }
+    @State private var showPeople = false
     private func load() async { guard let t = model.token, let id = model.user?.id else { return }; do { conversations = try await LastCallAPI.shared.fetchConversations(userID: id, accessToken: t) } catch {} }
 }
 
@@ -235,8 +237,8 @@ struct NativeChat: View {
 }
 
 struct NativeProfile: View {
-    @EnvironmentObject private var model: NativeAppModel; @State private var notes: [NotificationRow] = []; @State private var showNotes = false
-    var body: some View { NavigationStack { ScrollView { VStack(spacing: 13) { NativeImage(url: URL(string: "https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&w=1200&q=80")).frame(height: 165); Circle().fill(Look.green).frame(width: 78).overlay(Text("LC").font(.system(size: 22, weight: .bold))); Text(model.profile?.publicName ?? (model.session ? "LAST CALL MEMBER" : "Welcome to LAST CALL")).font(.system(size: 20, weight: .bold, design: .serif)); Text(model.profile?.bio ?? "Good stories. Great company. Always up for a last call. 🍻").font(.system(size: 11, design: .serif)).foregroundStyle(Look.muted).multilineTextAlignment(.center); if model.session { HStack { Stat(value: "🍺", label: "Reactions"); Stat(value: "\(model.unread)", label: "Notifications"); Stat(value: "FREE", label: "Membership") }; Button("NOTIFICATIONS") { showNotes = true }.buttonStyle(OutlineButton()); Button("COMMUNITY") { model.tab = .community }.buttonStyle(OutlineButton()); Button("SIGN OUT") { model.signOut() }.buttonStyle(OutlineButton()) } else { Button("BECOME A FREE MEMBER →") { model.authMode = .signUp; model.showAuth = true }.buttonStyle(PrimaryButton()); Button("SIGN IN") { model.authMode = .signIn; model.showAuth = true }.buttonStyle(OutlineButton()) } }.padding(13) }.background(Look.black.ignoresSafeArea()).foregroundStyle(Look.cream).navigationBarHidden(true).sheet(isPresented: $showNotes) { NativeNotifications(notes: notes) }.task { await loadNotes() } } }
+    @EnvironmentObject private var model: NativeAppModel; @State private var notes: [NotificationRow] = []; @State private var showNotes = false; @State private var showPeople = false
+    var body: some View { NavigationStack { ScrollView { VStack(spacing: 13) { NativeImage(url: URL(string: "https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&w=1200&q=80")).frame(height: 165); Circle().fill(Look.green).frame(width: 78).overlay(Text("LC").font(.system(size: 22, weight: .bold))); Text(model.profile?.publicName ?? (model.session ? "LAST CALL MEMBER" : "Welcome to LAST CALL")).font(.system(size: 20, weight: .bold, design: .serif)); Text(model.profile?.bio ?? "Good stories. Great company. Always up for a last call. 🍻").font(.system(size: 11, design: .serif)).foregroundStyle(Look.muted).multilineTextAlignment(.center); if model.session { HStack { Stat(value: "🍺", label: "Reactions"); Stat(value: "\(model.unread)", label: "Notifications"); Stat(value: "FREE", label: "Membership") }; Button("NOTIFICATIONS") { showNotes = true }.buttonStyle(OutlineButton()); Button("COMMUNITY") { showPeople = true }.buttonStyle(OutlineButton()); Button("SIGN OUT") { model.signOut() }.buttonStyle(OutlineButton()) } else { Button("BECOME A FREE MEMBER →") { model.authMode = .signUp; model.showAuth = true }.buttonStyle(PrimaryButton()); Button("SIGN IN") { model.authMode = .signIn; model.showAuth = true }.buttonStyle(OutlineButton()) } }.padding(13) }.background(Look.black.ignoresSafeArea()).foregroundStyle(Look.cream).navigationBarHidden(true).sheet(isPresented: $showNotes) { NativeNotifications(notes: notes) }.sheet(isPresented: $showPeople) { NativeCommunity() }.task { await loadNotes() } } }
     private func loadNotes() async { guard let t = model.token, let id = model.user?.id else { return }; notes = (try? await LastCallAPI.shared.fetchNotifications(userID: id, accessToken: t)) ?? [] }
 }
 
