@@ -106,7 +106,7 @@ final class NativeAppModel: ObservableObject {
     }
 }
 
-enum NativeTab: String, CaseIterable { case home = "Home", discover = "Stories", write = "Write", community = "People", messages = "Messages", profile = "Profile" }
+enum NativeTab: String, CaseIterable { case home = "Home", discover = "Stories", write = "Write", messages = "Messages", profile = "Profile" }
 
 struct NativeRootView: View {
     @EnvironmentObject private var model: NativeAppModel
@@ -115,7 +115,6 @@ struct NativeRootView: View {
             NativeHome().tag(NativeTab.home)
             NativeDiscover().tag(NativeTab.discover)
             NativeWrite().tag(NativeTab.write)
-            NativeCommunity().tag(NativeTab.community)
             NativeMessages().tag(NativeTab.messages)
             NativeProfile().tag(NativeTab.profile)
         }
@@ -128,13 +127,23 @@ struct NativeRootView: View {
 
 struct NativeHeader: View {
     @EnvironmentObject private var model: NativeAppModel
+    @State private var showCommunity = false
     var body: some View {
         HStack {
             Text("LAST CALL").font(.system(size: 15, weight: .bold, design: .serif)).tracking(2.4)
             Spacer()
             Button { model.tab = .discover } label: { Image(systemName: "magnifyingglass") }
-            if model.session { Button { model.tab = .profile } label: { Circle().fill(Look.green).frame(width: 27, height: 27).overlay(Text("LC").font(.system(size: 8, weight: .bold))) } } else { Button("SIGN IN") { model.authMode = .signIn; model.showAuth = true }.font(.system(size: 7, weight: .bold)) }
-        }.foregroundStyle(Look.cream).padding(.top, 6)
+            if model.session {
+                Button { showCommunity = true } label: { Image(systemName: "person.2.fill") }
+                    .accessibilityLabel("Community")
+                Button { model.tab = .profile } label: { Circle().fill(Look.green).frame(width: 27, height: 27).overlay(Text("LC").font(.system(size: 8, weight: .bold))) }
+            } else {
+                Button("SIGN IN") { model.authMode = .signIn; model.showAuth = true }.font(.system(size: 7, weight: .bold))
+            }
+        }
+        .foregroundStyle(Look.cream)
+        .padding(.top, 6)
+        .sheet(isPresented: $showCommunity) { NativeCommunity() }
     }
 }
 
@@ -218,42 +227,3 @@ struct NewConversationSheet: View {
 }
 
 @MainActor final class ConversationRouter: ObservableObject { static let shared = ConversationRouter(); @Published var openID: UUID? }
-
-struct NativeMessages: View {
-    @EnvironmentObject private var model: NativeAppModel; @State private var conversations: [ConversationRow] = []; @State private var selected: ConversationRow?; @StateObject private var router = ConversationRouter.shared
-    var body: some View { NavigationStack { Group { if !model.session { VStack(spacing: 12) { Text("Messages").font(.system(size: 27, weight: .bold, design: .serif)); Text("Sign in to message other LAST CALL members.").font(.system(size: 11)).foregroundStyle(Look.muted); Button("SIGN IN →") { model.authMode = .signIn; model.showAuth = true }.buttonStyle(PrimaryButton()) } } else { List(conversations) { c in Button { selected = c } label: { HStack { Circle().fill(Look.green).frame(width: 38).overlay(Text("LC").font(.system(size: 8, weight: .bold))); VStack(alignment: .leading) { Text(c.otherUser.publicName).font(.system(size: 11, weight: .semibold)); Text(c.latestMessage?.body ?? (c.status == "pending" ? "Message request" : "Start the conversation")).font(.system(size: 8)).foregroundStyle(Look.muted).lineLimit(1) }; Spacer(); if c.status == "pending" { Text("REQUEST").font(.system(size: 6, weight: .bold)).foregroundStyle(Look.gold) } } } } .scrollContentBackground(.hidden) } }.background(Look.black).foregroundStyle(Look.cream).navigationTitle("Messages").toolbar { if model.session { ToolbarItem(placement: .topBarTrailing) { Button("People") { model.tab = .community }.font(.system(size: 8, weight: .bold)) } } }.task { await load() }.onChange(of: router.openID) { _, id in if let id { Task { await load(); selected = conversations.first(where: { $0.id == id }) } } }.sheet(item: $selected) { NativeChat(conversation: $0) } } }
-    private func load() async { guard let t = model.token, let id = model.user?.id else { return }; do { conversations = try await LastCallAPI.shared.fetchConversations(userID: id, accessToken: t) } catch {} }
-}
-
-struct NativeChat: View {
-    @EnvironmentObject private var model: NativeAppModel; let conversation: ConversationRow; @State private var messages: [MessageRow] = []; @State private var text = ""; @State private var working = false; @Environment(\.dismiss) private var dismiss
-    var pending: Bool { conversation.status == "pending" }
-    var body: some View { NavigationStack { VStack(spacing: 0) { if pending { VStack(spacing: 8) { Text("MESSAGE REQUEST").font(.system(size: 8, weight: .bold)).tracking(1).foregroundStyle(Look.gold); Text("Accept this request to start chatting, or block the member.").font(.system(size: 9)).foregroundStyle(Look.muted); HStack { Button("ACCEPT") { Task { await respond("accepted") } }.buttonStyle(PrimaryButton()); Button("BLOCK") { Task { await respond("blocked") } }.buttonStyle(OutlineButton()) } }.padding(11).background(Look.card) }; ScrollViewReader { proxy in ScrollView { LazyVStack(alignment: .leading, spacing: 8) { ForEach(messages) { m in HStack { if m.senderId == model.user?.id { Spacer(); Text(m.body).padding(10).background(Look.green).clipShape(RoundedRectangle(cornerRadius: 12)).frame(maxWidth: 280, alignment: .trailing) } else { Text(m.body).padding(10).background(Look.card).clipShape(RoundedRectangle(cornerRadius: 12)).frame(maxWidth: 280, alignment: .leading); Spacer() } }.id(m.id).task { if m.senderId != model.user?.id, let t = model.token { try? await LastCallAPI.shared.markMessageRead(messageID: m.id, accessToken: t) } } } }.padding(11) }.onChange(of: messages.count) { _, _ in if let last = messages.last { proxy.scrollTo(last.id, anchor: .bottom) } } }; if !pending { HStack(spacing: 7) { TextField("Message", text: $text, axis: .vertical).textFieldStyle(LCField()); Button("SEND") { Task { await send() } }.buttonStyle(PrimaryButton()).disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || working) }.padding(9).background(Look.card) } }.background(Look.black).foregroundStyle(Look.cream).navigationTitle(conversation.otherUser.publicName).navigationBarTitleDisplayMode(.inline).toolbar { ToolbarItem(placement: .topBarLeading) { Button("Close") { dismiss() } } }.task { await load() } } }
-    private func load() async { guard let t = model.token else { return }; messages = (try? await LastCallAPI.shared.fetchMessages(conversationID: conversation.id, accessToken: t)) ?? [] }
-    private func respond(_ decision: String) async { guard let t = model.token else { return }; do { try await LastCallAPI.shared.respondToMessageRequest(conversationID: conversation.id, decision: decision, accessToken: t); dismiss() } catch { model.error = "That request could not be updated." } }
-    private func send() async { guard let t = model.token, let id = model.user?.id else { return }; let b = text.trimmingCharacters(in: .whitespacesAndNewlines); guard !b.isEmpty else { return }; working = true; text = ""; do { try await LastCallAPI.shared.sendMessage(conversationID: conversation.id, senderID: id, body: b, accessToken: t); messages = (try? await LastCallAPI.shared.fetchMessages(conversationID: conversation.id, accessToken: t)) ?? messages } catch { model.error = "That message could not be sent." }; working = false }
-}
-
-struct NativeProfile: View {
-    @EnvironmentObject private var model: NativeAppModel; @State private var notes: [NotificationRow] = []; @State private var showNotes = false
-    var body: some View { NavigationStack { ScrollView { VStack(spacing: 13) { NativeImage(url: URL(string: "https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&w=1200&q=80")).frame(height: 165); Circle().fill(Look.green).frame(width: 78).overlay(Text("LC").font(.system(size: 22, weight: .bold))); Text(model.profile?.publicName ?? (model.session ? "LAST CALL MEMBER" : "Welcome to LAST CALL")).font(.system(size: 20, weight: .bold, design: .serif)); Text(model.profile?.bio ?? "Good stories. Great company. Always up for a last call. 🍻").font(.system(size: 11, design: .serif)).foregroundStyle(Look.muted).multilineTextAlignment(.center); if model.session { HStack { Stat(value: "🍺", label: "Reactions"); Stat(value: "\(model.unread)", label: "Notifications"); Stat(value: "FREE", label: "Membership") }; Button("NOTIFICATIONS") { showNotes = true }.buttonStyle(OutlineButton()); Button("COMMUNITY") { model.tab = .community }.buttonStyle(OutlineButton()); Button("SIGN OUT") { model.signOut() }.buttonStyle(OutlineButton()) } else { Button("BECOME A FREE MEMBER →") { model.authMode = .signUp; model.showAuth = true }.buttonStyle(PrimaryButton()); Button("SIGN IN") { model.authMode = .signIn; model.showAuth = true }.buttonStyle(OutlineButton()) } }.padding(13) }.background(Look.black.ignoresSafeArea()).foregroundStyle(Look.cream).navigationBarHidden(true).sheet(isPresented: $showNotes) { NativeNotifications(notes: notes) }.task { await loadNotes() } } }
-    private func loadNotes() async { guard let t = model.token, let id = model.user?.id else { return }; notes = (try? await LastCallAPI.shared.fetchNotifications(userID: id, accessToken: t)) ?? [] }
-}
-
-struct NativeNotifications: View { @EnvironmentObject private var model: NativeAppModel; let notes: [NotificationRow]; @Environment(\.dismiss) private var dismiss; var body: some View { NavigationStack { List(notes) { n in VStack(alignment: .leading, spacing: 4) { Text(label(n)).font(.system(size: 11, weight: .semibold)); Text(n.createdAt).font(.system(size: 7)).foregroundStyle(Look.muted) } }.scrollContentBackground(.hidden).background(Look.black).foregroundStyle(Look.cream).navigationTitle("Notifications").toolbar { ToolbarItem(placement: .topBarLeading) { Button("Close") { dismiss() } } }.task { if let t = model.token, let id = model.user?.id { try? await LastCallAPI.shared.markNotificationsRead(userID: id, accessToken: t); model.unread = 0 } } } }
-    private func label(_ n: NotificationRow) -> String { switch n.type { case "message_request": return "You have a new message request."; case "new_message": return "You have a new message."; case "new_follower": return "Someone followed you."; default: return "You have a new LAST CALL notification." } }
-}
-
-struct NativeStory: Identifiable, Hashable {
-    let id: UUID; let title: String; let body: String; let author: String; let location: String; let category: String; let reactions: Int; let comments: Int; let imageURL: URL?; let isSample: Bool
-    init(id: UUID = UUID(), title: String, body: String, author: String, location: String, category: String, reactions: Int, comments: Int, imageURL: URL?, isSample: Bool = false) { self.id=id; self.title=title; self.body=body; self.author=author; self.location=location; self.category=category; self.reactions=reactions; self.comments=comments; self.imageURL=imageURL; self.isSample=isSample }
-    init(remote: RemoteStory, reactions: Int) { self.init(id: remote.id, title: remote.title, body: remote.body, author: remote.anonymousName ?? "LAST CALL member", location: remote.location.isEmpty ? "Worldwide" : remote.location, category: remote.category, reactions: reactions, comments: 0, imageURL: URL(string: "https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&w=1200&q=82")) }
-    static let samples = [NativeStory(title: "The Customer Who Refused to Take the Hint", body: "Sample content — real LAST CALL stories will appear here once published.", author: "SAMPLE", location: "Dublin, Ireland", category: "Closing Time", reactions: 142, comments: 12, imageURL: URL(string: "https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&w=1200&q=82"), isSample: true), NativeStory(title: "We Definitely Shouldn’t Have Stayed for One More", body: "Sample content — real LAST CALL stories will appear here once published.", author: "SAMPLE", location: "Galway, Ireland", category: "After Hours", reactions: 112, comments: 9, imageURL: URL(string: "https://images.unsplash.com/photo-1572116469696-31de0f17cc34?auto=format&fit=crop&w=1200&q=82"), isSample: true), NativeStory(title: "Never Trust a Man Who Says ‘Just One Quick Pint’", body: "Sample content — real LAST CALL stories will appear here once published.", author: "SAMPLE", location: "Cork, Ireland", category: "Bar Wisdom", reactions: 89, comments: 7, imageURL: URL(string: "https://images.unsplash.com/photo-1527761939622-933c0a2a6a57?auto=format&fit=crop&w=1200&q=82"), isSample: true)]
-}
-
-struct NativeImage: View { let url: URL?; var body: some View { AsyncImage(url: url) { phase in switch phase { case .success(let image): image.resizable().scaledToFill(); default: Rectangle().fill(Look.card) } }.clipped() } }
-struct Stat: View { let value: String; let label: String; var body: some View { VStack(spacing: 3) { Text(value).font(.system(size: 15, weight: .bold)); Text(label.uppercased()).font(.system(size: 6, weight: .bold)).tracking(1).foregroundStyle(Look.muted) }.frame(maxWidth: .infinity) } }
-struct PrimaryButton: ButtonStyle { func makeBody(configuration: Configuration) -> some View { configuration.label.font(.system(size: 8, weight: .bold)).tracking(1).foregroundStyle(Look.black).padding(.horizontal, 13).padding(.vertical, 9).background(Look.gold).clipShape(RoundedRectangle(cornerRadius: 7)).opacity(configuration.isPressed ? 0.75 : 1) } }
-struct OutlineButton: ButtonStyle { func makeBody(configuration: Configuration) -> some View { configuration.label.font(.system(size: 7, weight: .bold)).tracking(.8).foregroundStyle(Look.gold).padding(.horizontal, 9).padding(.vertical, 7).background(Look.card).clipShape(RoundedRectangle(cornerRadius: 7)).overlay(RoundedRectangle(cornerRadius: 7).stroke(Look.gold.opacity(0.35))).opacity(configuration.isPressed ? 0.7 : 1) } }
-struct LCField: TextFieldStyle { func _body(configuration: TextField<Self._Label>) -> some View { configuration.padding(11).background(Look.card).foregroundStyle(Look.cream).clipShape(RoundedRectangle(cornerRadius: 8)).overlay(RoundedRectangle(cornerRadius: 8).stroke(Look.line)) } }
-struct Look { static let black = Color(red: 0.03, green: 0.03, blue: 0.025); static let card = Color(red: 0.08, green: 0.075, blue: 0.065); static let cream = Color(red: 0.95, green: 0.92, blue: 0.85); static let gold = Color(red: 0.84, green: 0.70, blue: 0.34); static let green = Color(red: 0.12, green: 0.36, blue: 0.22); static let muted = Color(red: 0.62, green: 0.59, blue: 0.52); static let line = Color.white.opacity(0.10) }
