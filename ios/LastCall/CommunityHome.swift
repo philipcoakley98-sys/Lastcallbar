@@ -1,21 +1,11 @@
 import SwiftUI
 
-/// The signed-in Home / Feed from the approved LAST CALL app reference.
-/// It is intentionally separate from the public welcome screen.
+/// Signed-in Home / Feed from the approved LAST CALL app reference.
+/// All feed content comes from the authenticated Supabase session.
 struct CommunityHome: View {
     @EnvironmentObject private var model: NativeAppModel
     @State private var selected: NativeStory?
-    @State private var composerText = ""
-
-    private let storyNames = ["Your story", "Conor", "Seán", "Jack", "Aoife", "Damo"]
-    private let storyImages = [
-        "https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&w=240&q=80",
-        "https://images.unsplash.com/photo-1527761939622-933c0a2a6a57?auto=format&fit=crop&w=240&q=80",
-        "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=240&q=80",
-        "https://images.unsplash.com/photo-1519671282429-b44660ead0a7?auto=format&fit=crop&w=240&q=80",
-        "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=240&q=80",
-        "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=240&q=80"
-    ]
+    @State private var showNotifications = false
 
     var body: some View {
         NavigationStack {
@@ -34,6 +24,10 @@ struct CommunityHome: View {
             .sheet(item: $selected) { story in
                 NativeStoryDetail(story: story)
             }
+            .sheet(isPresented: $showNotifications) {
+                NativeNotifications()
+            }
+            .task { await model.refreshStories() }
         }
     }
 
@@ -56,8 +50,10 @@ struct CommunityHome: View {
             }
             Spacer()
             HStack(spacing: 16) {
-                Button { model.tab = .discover } label: { Image(systemName: "magnifyingglass").font(.system(size: 19, weight: .medium)) }
-                Button { model.tab = .profile } label: {
+                Button { model.tab = .discover } label: {
+                    Image(systemName: "magnifyingglass").font(.system(size: 19, weight: .medium))
+                }
+                Button { showNotifications = true } label: {
                     ZStack(alignment: .topTrailing) {
                         Image(systemName: "bell").font(.system(size: 19, weight: .medium))
                         if model.unread > 0 {
@@ -73,42 +69,38 @@ struct CommunityHome: View {
     }
 
     private var storyStrip: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 13) {
-                ForEach(Array(storyNames.enumerated()), id: \.offset) { index, name in
-                    VStack(spacing: 5) {
-                        ZStack(alignment: .bottomTrailing) {
-                            Circle()
-                                .stroke(Look.gold, lineWidth: 2)
-                                .frame(width: 65, height: 65)
-                                .overlay {
-                                    AsyncImage(url: URL(string: storyImages[index])) { phase in
-                                        if case .success(let image) = phase {
-                                            image.resizable().scaledToFill()
-                                        } else {
-                                            Look.card
+        Group {
+            if model.stories.isEmpty {
+                EmptyView()
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 13) {
+                        ForEach(Array(model.stories.prefix(8))) { story in
+                            Button { selected = story } label: {
+                                VStack(spacing: 5) {
+                                    Circle()
+                                        .stroke(Look.gold, lineWidth: 2)
+                                        .frame(width: 65, height: 65)
+                                        .overlay {
+                                            NativeImage(url: story.imageURL)
+                                                .clipShape(Circle())
+                                                .padding(3)
                                         }
-                                    }
-                                    .clipShape(Circle())
-                                    .padding(3)
+                                    Text(story.author)
+                                        .font(.system(size: 9, weight: .medium))
+                                        .foregroundStyle(Look.cream)
+                                        .lineLimit(1)
                                 }
-                            if index == 0 {
-                                Circle().fill(.white).frame(width: 23, height: 23)
-                                    .overlay(Image(systemName: "plus").font(.system(size: 12, weight: .bold)).foregroundStyle(.black))
-                                    .offset(x: 3, y: 3)
+                                .frame(width: 72)
                             }
+                            .buttonStyle(.plain)
                         }
-                        Text(name)
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundStyle(Look.cream)
-                            .lineLimit(1)
                     }
-                    .frame(width: 72)
+                    .padding(.horizontal, 15)
                 }
+                .padding(.bottom, 12)
             }
-            .padding(.horizontal, 15)
         }
-        .padding(.bottom, 12)
     }
 
     private var composer: some View {
@@ -138,11 +130,15 @@ struct CommunityHome: View {
     private var feed: some View {
         LazyVStack(spacing: 0) {
             if model.stories.isEmpty {
-                Text("No stories yet. Be the first to share the craic.")
-                    .font(.system(size: 13, design: .serif))
-                    .foregroundStyle(Look.muted)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(20)
+                VStack(alignment: .leading, spacing: 7) {
+                    Text("No published stories yet.")
+                        .font(.system(size: 15, weight: .semibold, design: .serif))
+                    Text("Be the first to share the craic behind the bar.")
+                        .font(.system(size: 12, design: .serif))
+                        .foregroundStyle(Look.muted)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(20)
             } else {
                 ForEach(model.stories) { story in
                     CommunityPost(story: story) {
@@ -170,9 +166,9 @@ private struct CommunityPost: View {
                     .frame(width: 39, height: 39)
                     .clipShape(Circle())
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(story.author == "SAMPLE" ? "Conor_Mc" : story.author)
+                    Text(story.author)
                         .font(.system(size: 12, weight: .semibold))
-                    Text(story.isSample ? "2h ago" : story.location)
+                    Text(story.location)
                         .font(.system(size: 8))
                         .foregroundStyle(Look.muted)
                 }
@@ -197,7 +193,7 @@ private struct CommunityPost: View {
                 Button(action: react) {
                     HStack(spacing: 5) {
                         Image(systemName: model.reactions.contains(story.id) ? "heart.fill" : "heart")
-                        Text("\(story.reactions)")
+                        Text("\(story.reactions + (model.reactions.contains(story.id) ? 1 : 0))")
                     }
                 }
                 Button(action: open) {
