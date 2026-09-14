@@ -1,12 +1,17 @@
 name: iOS build check
+
 on:
   push:
-    paths: ['ios/**']
+    paths:
+      - 'ios/**'
   pull_request:
-    paths: ['ios/**']
+    paths:
+      - 'ios/**'
   workflow_dispatch:
+
 permissions:
   contents: write
+
 jobs:
   build:
     runs-on: macos-15
@@ -16,55 +21,29 @@ jobs:
         uses: actions/checkout@v4
       - name: Show Xcode version
         run: xcodebuild -version
-      - name: Normalize Swift source
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          path = Path('ios/LastCall/SupabaseAPI.swift')
-          text = path.read_text()
-          start = text.index('    func fetchCommentCounts')
-          end = text.index('    func toggleBeerReaction', start)
-          replacement = '''    func fetchCommentCounts(storyIDs: [UUID], accessToken: String?) async throws -> [UUID: Int] {
-              guard !storyIDs.isEmpty else { return [:] }
-              var components = URLComponents(url: baseURL.appendingPathComponent("rest/v1/comments"), resolvingAgainstBaseURL: false)!
-              components.queryItems = [
-                  URLQueryItem(name: "select", value: "story_id"),
-                  URLQueryItem(name: "story_id", value: "in.(\\(storyIDs.map(\\.uuidString).joined(separator: ",")))"),
-                  URLQueryItem(name: "limit", value: "1000")
-              ]
-              var request = URLRequest(url: components.url!)
-              request.setValue(publishableKey, forHTTPHeaderField: "apikey")
-              request.setValue("Bearer \\(accessToken ?? publishableKey)", forHTTPHeaderField: "Authorization")
-              let (data, response) = try await URLSession.shared.data(for: request)
-              try validate(response, data: data)
-              let rows = try JSONDecoder.lastCall.decode([CommentCountRow].self, from: data)
-              return rows.reduce(into: [UUID: Int]()) { counts, row in
-                  counts[row.storyId, default: 0] += 1
-              }
-          }
-'''
-          path.write_text(text[:start] + replacement + text[end:])
-          for swift in Path('ios/LastCall').rglob('*.swift'):
-              swift.write_text(swift.read_text().replace('+ =', '+='))
-          PY
+      - name: Normalize known Swift source issues
+        run: python3 ios/normalize_build.py
       - name: Format Swift sources
+        run: swift format -i $(find ios/LastCall -name '*.swift' -print)
+      - name: Commit normalized Swift sources
         run: |
-          swift format -i $(find ios/LastCall -name '*.swift' -print)
           if ! git diff --quiet -- ios/LastCall; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add ios/LastCall
-            git commit -m "chore: format Swift sources [skip ci]"
+            git commit -m "chore: normalize Swift sources [skip ci]"
             git push
           fi
       - name: Build LAST CALL Debug for iPhone Simulator
         run: xcodebuild -project ios/LastCall.xcodeproj -scheme LastCall -sdk iphonesimulator -configuration Debug -derivedDataPath build/DebugDerivedData CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
       - name: Build LAST CALL Release for iPhone Simulator
         run: xcodebuild -project ios/LastCall.xcodeproj -scheme LastCall -sdk iphonesimulator -configuration Release -derivedDataPath build/ReleaseDerivedData CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
-      - name: Package Debug simulator app
-        run: cd build/DebugDerivedData/Build/Products/Debug-iphonesimulator && ditto -c -k --sequesterRsrc --keepParent LastCall.app LastCall-Debug-Simulator.zip
-      - name: Package Release simulator app
-        run: cd build/ReleaseDerivedData/Build/Products/Release-iphonesimulator && ditto -c -k --sequesterRsrc --keepParent LastCall.app LastCall-Release-Simulator.zip
+      - name: Package simulator builds
+        run: |
+          cd build/DebugDerivedData/Build/Products/Debug-iphonesimulator
+          ditto -c -k --sequesterRsrc --keepParent LastCall.app LastCall-Debug-Simulator.zip
+          cd ../../../../Release-iphonesimulator
+          ditto -c -k --sequesterRsrc --keepParent LastCall.app LastCall-Release-Simulator.zip
       - name: Upload simulator builds
         uses: actions/upload-artifact@v4
         with:
