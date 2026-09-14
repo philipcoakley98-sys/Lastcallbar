@@ -28,6 +28,11 @@ jobs:
           s = s.replace('    @StateObject private var router = ConversationRouter.shared\n', '')
           old = '''        .sheet(item: Binding(get: { router.openID.map { ConversationRow(id: $0, otherUser: ProfileRow(id: UUID(), publicName: "LAST CALL", bio: nil, anonymous: true, privacyMessages: "nobody"), status: "accepted", latestMessage: nil) } }, set: { if $0 == nil { router.openID = nil } })) { conversation in NativeChat(conversation: conversation) }\n'''
           s = s.replace(old, '')
+          s = s.replace('.tracking(.8)', '.tracking(0.8)')
+          s = s.replace('catch { error = "Stories could not be refreshed just now." }', 'catch { self.error = "Stories could not be refreshed just now." }')
+          s = s.replace('catch { error = authError(error) }', 'catch let caughtError { self.error = authError(caughtError) }')
+          s = s.replace('catch { error = "That reaction could not be saved." }', 'catch { self.error = "That reaction could not be saved." }')
+          s = s.replace('catch { error = "Your story could not be sent just now."; return false }', 'catch { self.error = "Your story could not be sent just now."; return false }')
           native.write_text(s)
 
           api = Path('ios/LastCall/SupabaseAPI.swift')
