@@ -48,7 +48,7 @@ final class NativeAppModel: ObservableObject {
                 let counts = (try? await LastCallAPI.shared.fetchReactionCounts(storyIDs: ids, accessToken: token ?? "")) ?? [:]
                 stories = remote.map { NativeStory(remote: $0, reactions: counts[$0.id] ?? 0) }
             }
-        } catch { error = "Stories could not be refreshed just now." }
+        } catch { self.error = "Stories could not be refreshed just now." }
         refreshID = UUID()
     }
 
@@ -67,7 +67,7 @@ final class NativeAppModel: ObservableObject {
             guard let t = auth.accessToken, let u = auth.user else { throw LastCallAPIError.server("Sign in did not return a session.") }
             token = t; user = u; signedIn = true; showAuth = false
             await refreshAccount()
-        } catch { error = authError(error) }
+        } catch let caughtError { self.error = authError(caughtError) }
     }
 
     func signUp(_ email: String, _ password: String, _ name: String) async {
@@ -78,7 +78,7 @@ final class NativeAppModel: ObservableObject {
             } else {
                 error = "Account created. Check your email to confirm your address, then come back to LAST CALL and sign in."
             }
-        } catch { error = authError(error) }
+        } catch let caughtError { self.error = authError(caughtError) }
     }
 
     func signOut() { LastCallAPI.shared.signOut(); token = nil; user = nil; profile = nil; signedIn = false; reactions = []; unread = 0 }
@@ -90,13 +90,13 @@ final class NativeAppModel: ObservableObject {
             _ = try await LastCallAPI.shared.toggleBeerReaction(storyID: story.id, userID: id, accessToken: t, reacted: active)
             if active { reactions.remove(story.id) } else { reactions.insert(story.id) }
             await refreshStories()
-        } catch { error = "That reaction could not be saved." }
+        } catch { self.error = "That reaction could not be saved." }
     }
 
     func submit(title: String, body: String, category: String, city: String, country: String, anonymous: Bool) async -> Bool {
         guard let t = token, let id = user?.id else { authMode = .signIn; showAuth = true; return false }
         do { try await LastCallAPI.shared.insertStory(title: title, body: body, category: category, city: city, country: country, anonymous: anonymous, accessToken: t, userID: id); return true }
-        catch { error = "Your story could not be sent just now."; return false }
+        catch { self.error = "Your story could not be sent just now."; return false }
     }
 
     private func authError(_ e: Error) -> String {
@@ -256,6 +256,6 @@ struct NativeStory: Identifiable, Hashable {
 struct NativeImage: View { let url: URL?; var body: some View { AsyncImage(url: url) { phase in switch phase { case .success(let image): image.resizable().scaledToFill(); default: Rectangle().fill(Look.card) } }.clipped() } }
 struct Stat: View { let value: String; let label: String; var body: some View { VStack(spacing: 3) { Text(value).font(.system(size: 15, weight: .bold)); Text(label.uppercased()).font(.system(size: 6, weight: .bold)).tracking(1).foregroundStyle(Look.muted) }.frame(maxWidth: .infinity) } }
 struct PrimaryButton: ButtonStyle { func makeBody(configuration: Configuration) -> some View { configuration.label.font(.system(size: 8, weight: .bold)).tracking(1).foregroundStyle(Look.black).padding(.horizontal, 13).padding(.vertical, 9).background(Look.gold).clipShape(RoundedRectangle(cornerRadius: 7)).opacity(configuration.isPressed ? 0.75 : 1) } }
-struct OutlineButton: ButtonStyle { func makeBody(configuration: Configuration) -> some View { configuration.label.font(.system(size: 7, weight: .bold)).tracking(.8).foregroundStyle(Look.gold).padding(.horizontal, 9).padding(.vertical, 7).background(Look.card).clipShape(RoundedRectangle(cornerRadius: 7)).overlay(RoundedRectangle(cornerRadius: 7).stroke(Look.gold.opacity(0.35))).opacity(configuration.isPressed ? 0.7 : 1) } }
+struct OutlineButton: ButtonStyle { func makeBody(configuration: Configuration) -> some View { configuration.label.font(.system(size: 7, weight: .bold)).tracking(0.8).foregroundStyle(Look.gold).padding(.horizontal, 9).padding(.vertical, 7).background(Look.card).clipShape(RoundedRectangle(cornerRadius: 7)).overlay(RoundedRectangle(cornerRadius: 7).stroke(Look.gold.opacity(0.35))).opacity(configuration.isPressed ? 0.7 : 1) } }
 struct LCField: TextFieldStyle { func _body(configuration: TextField<Self._Label>) -> some View { configuration.padding(11).background(Look.card).foregroundStyle(Look.cream).clipShape(RoundedRectangle(cornerRadius: 8)).overlay(RoundedRectangle(cornerRadius: 8).stroke(Look.line)) } }
 struct Look { static let black = Color(red: 0.03, green: 0.03, blue: 0.025); static let card = Color(red: 0.08, green: 0.075, blue: 0.065); static let cream = Color(red: 0.95, green: 0.92, blue: 0.85); static let gold = Color(red: 0.84, green: 0.70, blue: 0.34); static let green = Color(red: 0.12, green: 0.36, blue: 0.22); static let muted = Color(red: 0.62, green: 0.59, blue: 0.52); static let line = Color.white.opacity(0.10) }
