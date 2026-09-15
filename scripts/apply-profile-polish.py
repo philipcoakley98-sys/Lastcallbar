@@ -1,9 +1,17 @@
 from pathlib import Path
-p=Path('ios/LastCall/NativeApp.swift')
-s=p.read_text()
-needle='case .profile: NativeProfile()'
-if needle not in s: raise SystemExit('profile route already changed or missing')
-s=s.replace(needle,'case .profile: LastCallProfileScreen()',1)
+
+p = Path('ios/LastCall/NativeApp.swift')
+s = p.read_text()
+
+# Make the helper safe to run against either the pre-polish or already-polished tree.
+if 'LastCallProfileScreen' in s:
+    raise SystemExit(0)
+
+needle = 'case .profile: NativeProfile()'
+if needle not in s:
+    raise SystemExit('profile route missing')
+
+s = s.replace(needle, 'case .profile: LastCallProfileScreen()', 1)
 s += r'''
 
 struct LastCallProfileScreen: View {
