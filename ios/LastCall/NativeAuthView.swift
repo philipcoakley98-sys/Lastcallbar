@@ -12,7 +12,6 @@ struct NativeAuth: View {
   @State private var showReset = false
 
   private let pubURL = URL(string: "https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&w=1400&q=90")!
-
   private var trimmedEmail: String { email.trimmingCharacters(in: .whitespacesAndNewlines) }
   private var canSubmit: Bool { !working && !trimmedEmail.isEmpty && password.count >= 6 }
 
@@ -46,31 +45,23 @@ struct NativeAuth: View {
               }
               TextField("Email address", text: $email).modifier(AuthField(icon: "envelope", placeholder: "Email address", text: $email)).textInputAutocapitalization(.never).keyboardType(.emailAddress).autocorrectionDisabled().textContentType(.emailAddress)
               AuthSecureField(icon: "lock", placeholder: "Password (6+ characters)", text: $password).textContentType(mode == .signIn ? .password : .newPassword)
-              if let localError {
-                Text(localError).font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(.white).multilineTextAlignment(.center).padding(.horizontal, 10)
-              }
+              if let localError { Text(localError).font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(.white).multilineTextAlignment(.center).padding(.horizontal, 10) }
               Button { submit() } label: {
                 Text(working ? "PLEASE WAIT…" : (mode == .signIn ? "Log in" : "Create account")).font(.system(size: 17, weight: .bold, design: .rounded)).foregroundStyle(Look.black).frame(maxWidth: .infinity).frame(height: 56).background(Look.gold).clipShape(Capsule())
               }.disabled(!canSubmit).opacity(canSubmit ? 1 : 0.55)
-              if mode == .signUp {
-                Text("Your name is optional. You only need an email and a password to get started.").font(.system(size: 11, design: .rounded)).foregroundStyle(.white.opacity(0.72)).multilineTextAlignment(.center).padding(.horizontal, 12)
-              }
+              if mode == .signUp { Text("Your name is optional. You only need an email and a password to get started.").font(.system(size: 11, design: .rounded)).foregroundStyle(.white.opacity(0.72)).multilineTextAlignment(.center).padding(.horizontal, 12) }
               HStack(spacing: 5) {
                 Text(mode == .signIn ? "Don't have an account?" : "Already have an account?").foregroundStyle(.white.opacity(0.92))
                 Button(mode == .signIn ? "Sign up →" : "Log in →") { localError = nil; mode = mode == .signIn ? .signUp : .signIn }.foregroundStyle(Look.gold).fontWeight(.semibold)
               }.font(.system(size: 14, design: .rounded))
-              if mode == .signIn {
-                Button("Forgot password?") { localError = nil; showReset = true }.font(.system(size: 13, weight: .semibold, design: .rounded)).foregroundStyle(Look.gold).padding(.top, 8)
-              }
+              if mode == .signIn { Button("Forgot password?") { localError = nil; showReset = true }.font(.system(size: 13, weight: .semibold, design: .rounded)).foregroundStyle(Look.gold).padding(.top, 8) }
             }.padding(.horizontal, 22).padding(.bottom, proxy.safeAreaInsets.bottom + 28)
           }.frame(minHeight: proxy.size.height)
         }
       }
       .ignoresSafeArea().background(Color.black).preferredColorScheme(.dark)
       .onChange(of: mode) { _, _ in localError = nil }
-      .sheet(isPresented: $showReset) {
-        PasswordResetRequest(initialEmail: trimmedEmail).presentationDetents([.medium]).presentationDragIndicator(.visible).preferredColorScheme(.dark)
-      }
+      .sheet(isPresented: $showReset) { PasswordResetRequest(initialEmail: trimmedEmail).presentationDetents([.medium]).presentationDragIndicator(.visible).preferredColorScheme(.dark) }
     }
   }
 
@@ -93,7 +84,7 @@ private struct PasswordResetRequest: View {
   @State private var email: String
   @State private var working = false
   @State private var sent = false
-  @State private var error: String?
+  @State private var errorMessage: String?
 
   init(initialEmail: String) { _email = State(initialValue: initialEmail) }
 
@@ -104,7 +95,7 @@ private struct PasswordResetRequest: View {
         Text(sent ? "If an account exists for that email, we've sent a password reset link. Check your inbox and follow the link to continue." : "Enter the email you use for LAST CALL and we'll send you a secure reset link.").font(.system(size: 14, design: .rounded)).foregroundStyle(Look.muted)
         if !sent {
           TextField("Email address", text: $email).modifier(AuthField(icon: "envelope", placeholder: "Email address", text: $email)).textInputAutocapitalization(.never).keyboardType(.emailAddress).autocorrectionDisabled().textContentType(.emailAddress)
-          if let error { Text(error).font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(.white) }
+          if let errorMessage { Text(errorMessage).font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(.white) }
           Button(working ? "SENDING…" : "Email reset link") { sendReset() }
             .font(.system(size: 16, weight: .bold, design: .rounded)).foregroundStyle(Look.black).frame(maxWidth: .infinity).frame(height: 54).background(Look.gold).clipShape(Capsule()).disabled(working || email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty).opacity(working ? 0.6 : 1)
         } else {
@@ -120,7 +111,8 @@ private struct PasswordResetRequest: View {
   private func sendReset() {
     let normalized = email.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !normalized.isEmpty else { return }
-    working = true; error = nil
+    working = true
+    errorMessage = nil
     Task {
       do {
         var components = URLComponents(string: "https://ccqyreaanjhfhglmmgkn.supabase.co/auth/v1/recover")!
@@ -134,7 +126,7 @@ private struct PasswordResetRequest: View {
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else { throw URLError(.badServerResponse) }
         await MainActor.run { working = false; sent = true }
       } catch {
-        await MainActor.run { working = false; error = "We couldn't send the reset email just now. Please try again." }
+        await MainActor.run { working = false; errorMessage = "We couldn't send the reset email just now. Please try again." }
       }
     }
   }
