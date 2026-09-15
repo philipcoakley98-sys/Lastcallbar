@@ -8,10 +8,19 @@ struct NativeAuth: View {
   @State private var password = ""
   @State private var name = ""
   @State private var working = false
+  @State private var localError: String?
 
   private let pubURL = URL(
     string: "https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&w=1400&q=90"
   )!
+
+  private var trimmedEmail: String {
+    email.trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
+  private var canSubmit: Bool {
+    !working && isValidEmail(trimmedEmail) && password.count >= 6
+  }
 
   var body: some View {
     GeometryReader { proxy in
@@ -75,8 +84,8 @@ struct NativeAuth: View {
 
             VStack(spacing: 12) {
               if mode == .signUp {
-                TextField("Name or display name", text: $name)
-                  .modifier(AuthField(icon: "person", placeholder: "Name or display name", text: $name))
+                TextField("Name or display name (optional)", text: $name)
+                  .modifier(AuthField(icon: "person", placeholder: "Name or display name (optional)", text: $name))
               }
 
               TextField("Email address", text: $email)
@@ -84,19 +93,21 @@ struct NativeAuth: View {
                 .textInputAutocapitalization(.never)
                 .keyboardType(.emailAddress)
                 .autocorrectionDisabled()
+                .textContentType(.emailAddress)
 
-              AuthSecureField(icon: "lock", placeholder: "Password", text: $password)
+              AuthSecureField(icon: "lock", placeholder: "Password (6+ characters)", text: $password)
+                .textContentType(mode == .signIn ? .password : .newPassword)
+
+              if let localError {
+                Text(localError)
+                  .font(.system(size: 12, weight: .semibold, design: .rounded))
+                  .foregroundStyle(.white)
+                  .multilineTextAlignment(.center)
+                  .padding(.horizontal, 10)
+              }
 
               Button {
-                working = true
-                Task {
-                  if mode == .signIn {
-                    await model.signIn(email, password)
-                  } else {
-                    await model.signUp(email, password, name)
-                  }
-                  working = false
-                }
+                submit()
               } label: {
                 Text(working ? "PLEASE WAIT…" : (mode == .signIn ? "Log in" : "Create account"))
                   .font(.system(size: 17, weight: .bold, design: .rounded))
@@ -106,13 +117,22 @@ struct NativeAuth: View {
                   .background(Look.gold)
                   .clipShape(Capsule())
               }
-              .disabled(working || email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || password.count < 6)
-              .opacity(working ? 0.7 : 1)
+              .disabled(!canSubmit)
+              .opacity(canSubmit ? 1 : 0.55)
+
+              if mode == .signUp {
+                Text("Your name is optional. You only need an email and a password to get started.")
+                  .font(.system(size: 11, design: .rounded))
+                  .foregroundStyle(.white.opacity(0.72))
+                  .multilineTextAlignment(.center)
+                  .padding(.horizontal, 12)
+              }
 
               HStack(spacing: 5) {
                 Text(mode == .signIn ? "Don't have an account?" : "Already have an account?")
                   .foregroundStyle(.white.opacity(0.92))
                 Button(mode == .signIn ? "Sign up →" : "Log in →") {
+                  localError = nil
                   mode = mode == .signIn ? .signUp : .signIn
                 }
                 .foregroundStyle(Look.gold)
@@ -122,7 +142,7 @@ struct NativeAuth: View {
 
               if mode == .signIn {
                 Button("Forgot password?") {
-                  model.error = "Password reset is not enabled yet."
+                  localError = "Password reset will be available once email recovery is connected."
                 }
                 .font(.system(size: 13, weight: .semibold, design: .rounded))
                 .foregroundStyle(Look.gold)
@@ -138,7 +158,38 @@ struct NativeAuth: View {
       .ignoresSafeArea()
       .background(Color.black)
       .preferredColorScheme(.dark)
+      .onChange(of: mode) { _, _ in localError = nil }
     }
+  }
+
+  private func submit() {
+    localError = nil
+    let normalized = trimmedEmail
+    guard isValidEmail(normalized) else {
+      localError = "Enter a valid email address."
+      return
+    }
+    guard password.count >= 6 else {
+      localError = "Your password needs at least 6 characters."
+      return
+    }
+
+    working = true
+    Task {
+      if mode == .signIn {
+        await model.signIn(normalized, password)
+      } else {
+        await model.signUp(normalized, password, name.trimmingCharacters(in: .whitespacesAndNewlines))
+      }
+      working = false
+    }
+  }
+
+  private func isValidEmail(_ value: String) -> Bool {
+    guard value.count >= 5, value.contains("@"), value.contains(".") else { return false }
+    let parts = value.split(separator: "@", omittingEmptySubsequences: false)
+    guard parts.count == 2, !parts[0].isEmpty, !parts[1].isEmpty else { return false }
+    return parts[1].contains(".") && !parts[1].hasPrefix(".") && !parts[1].hasSuffix(".")
   }
 }
 
