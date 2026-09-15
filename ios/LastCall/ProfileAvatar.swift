@@ -54,10 +54,3 @@ struct LastCallProfilePhotoPicker: View {
     }
   }
 }
-
-// ProfileRow currently exposes privacy and identity fields but not a location.
-// Keep this compatibility value available to the visual profile without making
-// location data mandatory in the database response.
-extension ProfileRow {
-  var location: String? { nil }
-}
