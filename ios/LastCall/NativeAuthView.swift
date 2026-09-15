@@ -71,16 +71,20 @@ struct NativeAuth: View {
             .padding(.horizontal, 18)
             .padding(.top, 4)
 
-            Spacer(minLength: 70)
+            Spacer(minLength: 64)
 
             VStack(spacing: 12) {
               if mode == .signUp {
-                AuthField(icon: "person", placeholder: "Name or display name", text: $name)
+                TextField("Name or display name", text: $name)
+                  .modifier(AuthField(icon: "person", placeholder: "Name or display name", text: $name))
               }
-              AuthField(icon: "envelope", placeholder: "Email address", text: $email)
+
+              TextField("Email address", text: $email)
+                .modifier(AuthField(icon: "envelope", placeholder: "Email address", text: $email))
                 .textInputAutocapitalization(.never)
                 .keyboardType(.emailAddress)
                 .autocorrectionDisabled()
+
               AuthSecureField(icon: "lock", placeholder: "Password", text: $password)
 
               Button {
@@ -152,6 +156,9 @@ private struct AuthField: ViewModifier {
         .foregroundStyle(.white)
         .font(.system(size: 16, design: .rounded))
         .tint(.white)
+        .placeholder(when: text.isEmpty) {
+          Text(placeholder).foregroundStyle(.white.opacity(0.55))
+        }
     }
     .padding(.horizontal, 17)
     .frame(height: 56)
@@ -161,8 +168,12 @@ private struct AuthField: ViewModifier {
 }
 
 private extension View {
-  func textFieldStyle(icon: String, placeholder: String, text: Binding<String>) -> some View {
-    modifier(AuthField(icon: icon, placeholder: placeholder, text: text))
+  @ViewBuilder
+  func placeholder<Content: View>(when shouldShow: Bool, alignment: Alignment = .leading, @ViewBuilder content: () -> Content) -> some View {
+    ZStack(alignment: alignment) {
+      content().opacity(shouldShow ? 1 : 0)
+      self
+    }
   }
 }
 
