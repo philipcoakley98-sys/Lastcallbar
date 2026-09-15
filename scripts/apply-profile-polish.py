@@ -1,9 +1,9 @@
 from pathlib import Path
 
+# Profile polish helper: safe to re-run against the already-polished tree.
 p = Path('ios/LastCall/NativeApp.swift')
 s = p.read_text()
 
-# Make the helper safe to run against either the pre-polish or already-polished tree.
 if 'LastCallProfileScreen' in s:
     raise SystemExit(0)
 
