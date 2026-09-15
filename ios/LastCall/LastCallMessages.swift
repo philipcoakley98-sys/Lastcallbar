@@ -14,49 +14,31 @@ struct LastCallMessages: View {
         let active = conversations.filter { $0.status.lowercased() != "pending" }
         if !requests.isEmpty {
           Section("MESSAGE REQUESTS") {
-            ForEach(requests) { c in
-              ConversationRowView(conversation: c, request: true) { selected = c }
-            }
+            ForEach(requests) { c in ConversationRowView(conversation: c, request: true) { selected = c } }
           }.listRowBackground(Look.black)
         }
         Section("CONVERSATIONS") {
           if active.isEmpty && !loading {
-            Text("No conversations yet. Find a bartender in Explore and start the chat.").font(
-              .system(size: 11, design: .serif)
-            ).foregroundStyle(Look.muted).padding(.vertical, 18).listRowBackground(Look.card)
+            Text("No conversations yet. Find a bartender in Explore and start the chat.").font(.system(size: 11, design: .serif)).foregroundStyle(Look.muted).padding(.vertical, 18).listRowBackground(Look.card)
           }
-          ForEach(active) { c in
-            ConversationRowView(conversation: c, request: false) { selected = c }
-          }
+          ForEach(active) { c in ConversationRowView(conversation: c, request: false) { selected = c } }
         }.listRowBackground(Look.black)
       }.scrollContentBackground(.hidden).background(Look.black).foregroundStyle(Look.cream)
         .navigationTitle("MESSAGES").navigationBarTitleDisplayMode(.inline).toolbar {
           ToolbarItem(placement: .topBarTrailing) {
-            Button {
-              showCommunity = true
-            } label: {
-              Image(systemName: "square.and.pencil")
-            }.foregroundStyle(Look.gold)
+            Button { showCommunity = true } label: { Image(systemName: "square.and.pencil") }.foregroundStyle(Look.gold)
           }
-        }.task { await load() }.refreshable { await load() }.sheet(item: $selected, onDismiss: {
-          Task { await load() }
-        }) {
-          ConversationRouter(conversation: $0)
-        }.sheet(isPresented: $showCommunity) { NativeCommunity() }
+        }.task { await load() }.refreshable { await load() }.sheet(item: $selected, onDismiss: { Task { await load() } }) { ConversationRouter(conversation: $0) }.sheet(isPresented: $showCommunity) { NativeCommunity() }
     }
   }
   private func load() async {
-    guard let token = model.token, let id = model.user?.id else {
-      loading = false
-      return
-    }
-    do {
-      conversations = try await LastCallAPI.shared.fetchConversations(
-        userID: id, accessToken: token)
-    } catch { model.error = "Messages could not be loaded just now." }
+    guard let token = model.token, let id = model.user?.id else { loading = false; return }
+    do { conversations = try await LastCallAPI.shared.fetchConversations(userID: id, accessToken: token) }
+    catch { model.error = "Messages could not be loaded just now." }
     loading = false
   }
 }
+
 private struct ConversationRowView: View {
   let conversation: ConversationRow
   let request: Bool
@@ -67,26 +49,18 @@ private struct ConversationRowView: View {
         ProfileAvatar(profile: conversation.otherUser, size: 48)
         VStack(alignment: .leading, spacing: 4) {
           HStack {
-            Text(conversation.otherUser.publicName).font(
-              .system(size: 14, weight: .bold, design: .serif))
-            if request {
-              Text("NEW").font(.system(size: 6, weight: .bold)).foregroundStyle(Look.black).padding(
-                .horizontal, 5
-              ).padding(.vertical, 3).background(Look.gold).clipShape(Capsule())
-            }
+            Text(conversation.otherUser.publicName).font(.system(size: 14, weight: .bold, design: .serif))
+            if request { Text("NEW").font(.system(size: 6, weight: .bold)).foregroundStyle(Look.black).padding(.horizontal, 5).padding(.vertical, 3).background(Look.gold).clipShape(Capsule()) }
           }
-          Text(
-            conversation.latestMessage?.body
-              ?? (request ? "Wants to start a conversation with you." : "No messages yet.")
-          ).font(.system(size: 9, design: .serif)).foregroundStyle(Look.muted).lineLimit(2)
+          Text(conversation.latestMessage?.body ?? (request ? "Wants to start a conversation with you." : "No messages yet.")).font(.system(size: 9, design: .serif)).foregroundStyle(Look.muted).lineLimit(2)
         }
         Spacer()
-        Image(systemName: "chevron.right").font(.system(size: 9, weight: .bold)).foregroundStyle(
-          Look.gold)
+        Image(systemName: "chevron.right").font(.system(size: 9, weight: .bold)).foregroundStyle(Look.gold)
       }.padding(.vertical, 5)
     }.buttonStyle(.plain).listRowBackground(Look.card)
   }
 }
+
 struct NativeChat: View {
   @EnvironmentObject private var model: NativeAppModel
   let conversation: ConversationRow
@@ -95,99 +69,94 @@ struct NativeChat: View {
   @State private var loading = true
   @State private var sending = false
   @State private var requestResolved = false
+
   var body: some View {
     VStack(spacing: 0) {
       ScrollViewReader { proxy in
         ScrollView(showsIndicators: false) {
           LazyVStack(spacing: 9) {
             if loading { ProgressView().tint(Look.gold).padding(30) }
-            if conversation.status.lowercased() == "pending" && !requestResolved && messages.isEmpty
-              && !loading
-            {
-              requestCard
-            }
-            ForEach(messages) { m in
-              ChatBubble(message: m, own: m.senderId == model.user?.id).id(m.id)
-            }
+            if conversation.status.lowercased() == "pending" && !requestResolved && messages.isEmpty && !loading { requestCard }
+            ForEach(messages) { m in ChatBubble(message: m, own: m.senderId == model.user?.id).id(m.id) }
           }.padding(14)
         }.onChange(of: messages.count) { _, _ in
           if let last = messages.last { withAnimation { proxy.scrollTo(last.id, anchor: .bottom) } }
         }
       }
       HStack(spacing: 8) {
-        TextField("Write a message…", text: $draft, axis: .vertical).lineLimit(1...4).padding(10)
-          .background(Look.card).clipShape(RoundedRectangle(cornerRadius: 10))
-        Button {
-          send()
-        } label: {
-          Image(systemName: "arrow.up.circle.fill").font(.system(size: 28))
-        }.foregroundStyle(Look.gold).disabled(
-          sending || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        TextField("Write a message…", text: $draft, axis: .vertical).lineLimit(1...4).padding(10).background(Look.card).clipShape(RoundedRectangle(cornerRadius: 10))
+        Button { send() } label: { Image(systemName: "arrow.up.circle.fill").font(.system(size: 28)) }.foregroundStyle(Look.gold).disabled(sending || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
       }.padding(10).background(Look.black)
-    }.background(Look.black.ignoresSafeArea()).foregroundStyle(Look.cream).navigationTitle(
-      conversation.otherUser.publicName
-    ).navigationBarTitleDisplayMode(.inline).task { await load() }
+    }.background(Look.black.ignoresSafeArea()).foregroundStyle(Look.cream).navigationTitle(conversation.otherUser.publicName).navigationBarTitleDisplayMode(.inline)
+      .task { await load() }
+      .task { await pollForMessages() }
   }
+
   private var requestCard: some View {
     VStack(spacing: 10) {
-      Text("MESSAGE REQUEST").font(.system(size: 8, weight: .bold)).tracking(1.2).foregroundStyle(
-        Look.gold)
-      Text("\(conversation.otherUser.publicName) would like to message you.").font(
-        .system(size: 12, design: .serif)
-      ).multilineTextAlignment(.center)
+      Text("MESSAGE REQUEST").font(.system(size: 8, weight: .bold)).tracking(1.2).foregroundStyle(Look.gold)
+      Text("\(conversation.otherUser.publicName) would like to message you.").font(.system(size: 12, design: .serif)).multilineTextAlignment(.center)
       HStack {
         Button("DECLINE") { respond("rejected") }.buttonStyle(OutlineButton())
         Button("ACCEPT") { respond("accepted") }.buttonStyle(PrimaryButton())
       }
-    }.padding(22).background(Look.card).clipShape(RoundedRectangle(cornerRadius: 12)).padding(
-      .top, 18)
+    }.padding(22).background(Look.card).clipShape(RoundedRectangle(cornerRadius: 12)).padding(.top, 18)
   }
+
   private func load() async {
-    guard let token = model.token else {
-      loading = false
-      return
-    }
+    guard let token = model.token else { loading = false; return }
     do {
-      messages = try await LastCallAPI.shared.fetchMessages(
-        conversationID: conversation.id, accessToken: token)
-      if let userID = model.user?.id {
-        for message in messages where message.senderId != userID {
-          try? await LastCallAPI.shared.markMessageRead(messageID: message.id, accessToken: token)
-        }
-      }
+      messages = try await LastCallAPI.shared.fetchMessages(conversationID: conversation.id, accessToken: token)
+      await markIncomingAsRead(messages, token: token)
     } catch { model.error = "This conversation could not be loaded." }
     loading = false
   }
+
+  private func pollForMessages() async {
+    while !Task.isCancelled {
+      try? await Task.sleep(for: .seconds(3))
+      guard !Task.isCancelled, let token = model.token else { continue }
+      do {
+        let latest = try await LastCallAPI.shared.fetchMessages(conversationID: conversation.id, accessToken: token)
+        if latest.map(\.id) != messages.map(\.id) {
+          messages = latest
+          await markIncomingAsRead(latest, token: token)
+        }
+      } catch { }
+    }
+  }
+
+  private func markIncomingAsRead(_ items: [MessageRow], token: String) async {
+    guard let userID = model.user?.id else { return }
+    for message in items where message.senderId != userID { try? await LastCallAPI.shared.markMessageRead(messageID: message.id, accessToken: token) }
+  }
+
   private func send() {
     let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !text.isEmpty, let token = model.token, let sender = model.user?.id else { return }
     sending = true
     Task {
       do {
-        try await LastCallAPI.shared.sendMessage(
-          conversationID: conversation.id, senderID: sender, body: text, accessToken: token)
+        try await LastCallAPI.shared.sendMessage(conversationID: conversation.id, senderID: sender, body: text, accessToken: token)
         draft = ""
-        messages = try await LastCallAPI.shared.fetchMessages(
-          conversationID: conversation.id, accessToken: token)
+        messages = try await LastCallAPI.shared.fetchMessages(conversationID: conversation.id, accessToken: token)
       } catch { model.error = "Your message could not be sent." }
       sending = false
     }
   }
+
   private func respond(_ decision: String) {
     guard let token = model.token else { return }
     Task {
       do {
-        try await LastCallAPI.shared.respondToMessageRequest(
-          conversationID: conversation.id, decision: decision, accessToken: token)
+        try await LastCallAPI.shared.respondToMessageRequest(conversationID: conversation.id, decision: decision, accessToken: token)
         requestResolved = true
-        if decision == "accepted" {
-          messages = try await LastCallAPI.shared.fetchMessages(
-            conversationID: conversation.id, accessToken: token)
-        }
+        if decision == "accepted" { messages = try await LastCallAPI.shared.fetchMessages(conversationID: conversation.id, accessToken: token) }
       } catch { model.error = "That message request could not be updated." }
     }
   }
 }
+
 private struct ChatBubble: View {
   let message: MessageRow
   let own: Bool
@@ -195,11 +164,8 @@ private struct ChatBubble: View {
     HStack {
       if own { Spacer(minLength: 45) }
       VStack(alignment: own ? .trailing : .leading, spacing: 3) {
-        Text(message.body).font(.system(size: 13, design: .serif)).padding(.horizontal, 12).padding(
-          .vertical, 9
-        ).background(own ? Look.green : Look.card).clipShape(RoundedRectangle(cornerRadius: 13))
-        Text(message.dateValue.formatted(date: .omitted, time: .shortened)).font(.system(size: 7))
-          .foregroundStyle(Look.muted)
+        Text(message.body).font(.system(size: 13, design: .serif)).padding(.horizontal, 12).padding(.vertical, 9).background(own ? Look.green : Look.card).clipShape(RoundedRectangle(cornerRadius: 13))
+        Text(message.dateValue.formatted(date: .omitted, time: .shortened)).font(.system(size: 7)).foregroundStyle(Look.muted)
       }
       if !own { Spacer(minLength: 45) }
     }
