@@ -27,6 +27,43 @@ extension LastCallAPI {
     return Dictionary(grouping: rows, by: \.storyId).mapValues(\.count)
   }
 
+  func uploadProfileAvatar(jpeg: Data, userID: UUID, accessToken: String) async throws -> URL {
+    let path = "\(userID.uuidString)/avatar.jpg"
+    let url = nativeBaseURL.appendingPathComponent("storage/v1/object/profile-media/\(path)")
+    var request = URLRequest(url: url)
+    request.httpMethod = "POST"
+    request.httpBody = jpeg
+    request.setValue(nativePublishableKey, forHTTPHeaderField: "apikey")
+    request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+    request.setValue("image/jpeg", forHTTPHeaderField: "Content-Type")
+    request.setValue("true", forHTTPHeaderField: "x-upsert")
+    let (data, response) = try await URLSession.shared.data(for: request)
+    guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+      throw LastCallAPIError.server(
+        String(data: data, encoding: .utf8) ?? "Your profile photo could not be uploaded.")
+    }
+
+    var components = URLComponents(
+      url: nativeBaseURL.appendingPathComponent("rest/v1/profiles"), resolvingAgainstBaseURL: false)!
+    components.queryItems = [URLQueryItem(name: "id", value: "eq.\(userID.uuidString)")]
+    var profileRequest = URLRequest(url: components.url!)
+    profileRequest.httpMethod = "PATCH"
+    profileRequest.setValue(nativePublishableKey, forHTTPHeaderField: "apikey")
+    profileRequest.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+    profileRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    profileRequest.setValue("return=minimal", forHTTPHeaderField: "Prefer")
+    profileRequest.httpBody = try JSONSerialization.data(
+      withJSONObject: ["avatar_url": nativeBaseURL.appendingPathComponent(
+        "storage/v1/object/public/profile-media/\(path)").absoluteString])
+    let (profileData, profileResponse) = try await URLSession.shared.data(for: profileRequest)
+    guard let profileHTTP = profileResponse as? HTTPURLResponse,
+      (200...299).contains(profileHTTP.statusCode) else {
+      throw LastCallAPIError.server(
+        String(data: profileData, encoding: .utf8) ?? "Your profile photo could not be saved.")
+    }
+    return nativeBaseURL.appendingPathComponent("storage/v1/object/public/profile-media/\(path)")
+  }
+
   func markMessageRead(messageID: UUID, accessToken: String) async throws {
     let body = try JSONEncoder.lastCall.encode(["message_id": messageID.uuidString])
     var request = URLRequest(
