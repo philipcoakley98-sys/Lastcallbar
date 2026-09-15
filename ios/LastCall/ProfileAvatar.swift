@@ -35,7 +35,6 @@ struct LastCallProfilePhotoPicker: View {
   private func upload(_ item: PhotosPickerItem) async {
     guard let token = model.token, let userID = model.user?.id else { return }
     await MainActor.run { uploading = true }
-    defer { Task { @MainActor in uploading = false } }
     do {
       guard let data = try await item.loadTransferable(type: Data.self),
             let jpeg = UIImage(data: data)?.jpegData(compressionQuality: 0.84) else {
@@ -43,8 +42,13 @@ struct LastCallProfilePhotoPicker: View {
       }
       _ = try await LastCallAPI.shared.uploadProfileAvatar(jpeg: jpeg, userID: userID, accessToken: token)
       await model.refreshAccount()
+      await MainActor.run {
+        uploading = false
+        self.item = nil
+      }
     } catch {
       await MainActor.run {
+        uploading = false
         model.error = "Your profile photo could not be saved. Please try another photo."
       }
     }
