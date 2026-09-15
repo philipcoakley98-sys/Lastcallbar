@@ -13,23 +13,10 @@ struct LockedHome: View {
           .scaledToFill()
           .frame(width: proxy.size.width, height: proxy.size.height)
           .clipped()
-          .overlay(
-            LinearGradient(
-              colors: [
-                .clear,
-                .clear,
-                .black.opacity(0.08),
-                .black.opacity(0.62),
-                .black.opacity(0.9)
-              ],
-              startPoint: .top,
-              endPoint: .bottom
-            )
-          )
+          .overlay(LinearGradient(colors: [.clear, .clear, .black.opacity(0.08), .black.opacity(0.62), .black.opacity(0.9)], startPoint: .top, endPoint: .bottom))
 
         VStack(spacing: 12) {
           Spacer()
-
           VStack(spacing: 10) {
             Button {
               model.authMode = .signUp
@@ -43,7 +30,6 @@ struct LockedHome: View {
                 .background(.white)
                 .clipShape(Capsule())
             }
-
             Button {
               model.authMode = .signIn
               model.showAuth = true
@@ -70,8 +56,8 @@ struct LockedHome: View {
         showRecovery = true
       }
       .sheet(isPresented: $showRecovery) {
-        if let recoveryToken {
-          LastCallPasswordRecovery(accessToken: recoveryToken) {
+        if let token = recoveryToken {
+          LastCallPasswordRecovery(accessToken: token) {
             showRecovery = false
             recoveryToken = nil
             model.authMode = .signIn
@@ -89,7 +75,6 @@ struct LockedHome: View {
     guard url.scheme?.lowercased() == "lastcall" else { return nil }
     let fragment = url.fragment ?? ""
     guard !fragment.isEmpty else { return nil }
-
     var values: [String: String] = [:]
     for pair in fragment.split(separator: "&") {
       let pieces = pair.split(separator: "=", maxSplits: 1).map(String.init)
@@ -98,9 +83,7 @@ struct LockedHome: View {
       let value = pieces[1].removingPercentEncoding ?? pieces[1]
       values[key] = value
     }
-    guard values["type"] == "recovery", let token = values["access_token"], !token.isEmpty else {
-      return nil
-    }
+    guard values["type"] == "recovery", let token = values["access_token"], !token.isEmpty else { return nil }
     return token
   }
 }
@@ -114,9 +97,7 @@ private struct LastCallPasswordRecovery: View {
   @State private var errorMessage: String?
   @State private var changed = false
 
-  private var valid: Bool {
-    password.count >= 6 && password == confirmation && !working
-  }
+  private var valid: Bool { password.count >= 6 && password == confirmation && !working }
 
   var body: some View {
     NavigationStack {
@@ -124,10 +105,7 @@ private struct LastCallPasswordRecovery: View {
         Text(changed ? "Password updated" : "Choose a new password")
           .font(.system(size: 28, weight: .bold, design: .serif))
           .foregroundStyle(Look.cream)
-
-        Text(changed
-          ? "Your LAST CALL password has been changed. You can now sign in with your new password."
-          : "Set a new password for your LAST CALL account.")
+        Text(changed ? "Your LAST CALL password has been changed. You can now sign in with your new password." : "Set a new password for your LAST CALL account.")
           .font(.system(size: 14, design: .rounded))
           .foregroundStyle(Look.muted)
 
@@ -151,7 +129,6 @@ private struct LastCallPasswordRecovery: View {
             .frame(height: 54)
             .background(Look.card, in: Capsule())
             .overlay(Capsule().stroke(Look.line))
-
           SecureField("Confirm new password", text: $confirmation)
             .textContentType(.newPassword)
             .foregroundStyle(.white)
@@ -159,7 +136,6 @@ private struct LastCallPasswordRecovery: View {
             .frame(height: 54)
             .background(Look.card, in: Capsule())
             .overlay(Capsule().stroke(Look.line))
-
           if !confirmation.isEmpty && password != confirmation {
             Text("The passwords don't match.")
               .font(.system(size: 11, weight: .semibold, design: .rounded))
@@ -170,7 +146,6 @@ private struct LastCallPasswordRecovery: View {
               .font(.system(size: 11, weight: .semibold, design: .rounded))
               .foregroundStyle(.white)
           }
-
           Button(working ? "UPDATING…" : "Update password") { updatePassword() }
             .font(.system(size: 16, weight: .bold, design: .rounded))
             .foregroundStyle(Look.black)
@@ -198,7 +173,6 @@ private struct LastCallPasswordRecovery: View {
     guard valid else { return }
     working = true
     errorMessage = nil
-
     Task {
       do {
         var request = URLRequest(url: URL(string: "https://ccqyreaanjhfhglmmgkn.supabase.co/auth/v1/user")!)
