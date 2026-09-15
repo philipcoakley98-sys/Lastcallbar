@@ -1,1 +1,18 @@
-{"images":[{"filename":"AppIcon.svg","idiom":"universal","platform":"ios","size":"1024x1024","scale":"1x"}],"info":{"author":"xcode","version":1}}
+{
+  "images" : [
+    {
+      "filename" : "AppIcon.pdf",
+      "idiom" : "universal",
+      "platform" : "ios",
+      "size" : "1024x1024",
+      "scale" : "1x"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  },
+  "properties" : {
+    "pre-rendered" : true
+  }
+}
