@@ -79,34 +79,33 @@ struct NativeStoryDetail: View {
                 .background(Look.card)
                 .clipShape(RoundedRectangle(cornerRadius: 9))
               Button { sendComment() } label: {
-                Image(systemName: "arrow.up.circle.fill")
-                  .font(.system(size: 26))
+                Image(systemName: sending ? "hourglass" : "paperplane.fill")
               }
-              .foregroundStyle(Look.gold)
               .disabled(sending || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+              .foregroundStyle(Look.gold)
             }
           }
         }
-        .padding(15)
+        .padding(18)
       }
       .background(Look.black.ignoresSafeArea())
       .foregroundStyle(Look.cream)
+      .navigationTitle("STORY")
+      .navigationBarTitleDisplayMode(.inline)
       .toolbar {
-        ToolbarItem(placement: .topBarLeading) {
-          Button("Close") { dismiss() }.foregroundStyle(Look.gold)
-        }
+        ToolbarItem(placement: .topBarLeading) { Button("Done") { dismiss() } }
       }
       .task { await loadComments() }
     }
   }
 
   private func loadComments() async {
+    guard let token = model.token else { loadingComments = false; return }
     do {
-      comments = try await LastCallAPI.shared.fetchComments(storyID: story.id, accessToken: model.token)
+      comments = try await LastCallAPI.shared.fetchStoryComments(storyID: story.id, accessToken: token)
       let ids = Array(Set(comments.map(\.userId)))
       if !ids.isEmpty {
-        let profiles = try await LastCallAPI.shared.fetchProfiles(ids: ids, accessToken: model.token ?? "")
-        authors = Dictionary(uniqueKeysWithValues: profiles.map { ($0.id, $0) })
+        authors = try await LastCallAPI.shared.fetchProfiles(userIDs: ids, accessToken: token)
       }
     } catch {
       model.error = "Comments could not be loaded just now."
@@ -115,16 +114,14 @@ struct NativeStoryDetail: View {
   }
 
   private func sendComment() {
-    let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !text.isEmpty, let token = model.token, let userID = model.user?.id else { return }
+    let value = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !value.isEmpty, let token = model.token else { return }
     sending = true
     Task {
       do {
-        let comment = try await LastCallAPI.shared.addComment(
-          storyID: story.id, userID: userID, body: text, accessToken: token)
-        comments.append(comment)
-        authors[userID] = model.profile
+        try await LastCallAPI.shared.createStoryComment(storyID: story.id, body: value, accessToken: token)
         draft = ""
+        await loadComments()
       } catch {
         model.error = "Your comment could not be posted."
       }
@@ -135,66 +132,44 @@ struct NativeStoryDetail: View {
 
 struct NativeCommunity: View {
   @EnvironmentObject private var model: NativeAppModel
+  @Environment(\.dismiss) private var dismiss
   @State private var people: [ProfileRow] = []
-  @State private var loading = true
 
   var body: some View {
     NavigationStack {
       List {
-        if loading {
-          ProgressView().tint(Look.gold).listRowBackground(Look.black)
-        }
         ForEach(people) { person in
-          HStack(spacing: 12) {
-            ProfileAvatar(profile: person, size: 44)
-            VStack(alignment: .leading, spacing: 3) {
-              Text(person.publicName)
-                .font(.system(size: 14, weight: .bold, design: .serif))
-              if let username = person.username, !username.isEmpty {
-                Text("@\(username)")
-                  .font(.system(size: 8))
-                  .foregroundStyle(Look.gold)
-              }
+          Button {
+            model.startConversation(with: person)
+            dismiss()
+          } label: {
+            HStack(spacing: 10) {
+              ProfileAvatar(profile: person, size: 40)
+              Text(person.publicName).foregroundStyle(Look.cream)
+              Spacer()
+              Image(systemName: "message").foregroundStyle(Look.gold)
             }
-            Spacer()
-            Button {
-              Task { try? await start(person) }
-            } label: {
-              Image(systemName: "message")
-            }
-            .foregroundStyle(Look.gold)
           }
           .listRowBackground(Look.card)
         }
       }
       .scrollContentBackground(.hidden)
       .background(Look.black)
-      .foregroundStyle(Look.cream)
-      .navigationTitle("COMMUNITY")
-      .task { await load() }
+      .navigationTitle("THE COMMUNITY")
+      .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
+      .task {
+        if let token = model.token, let userID = model.user?.id {
+          people = (try? await LastCallAPI.shared.fetchCommunityProfiles(excluding: userID, accessToken: token)) ?? []
+        }
+      }
     }
-  }
-
-  private func load() async {
-    guard let token = model.token else { loading = false; return }
-    do {
-      people = try await LastCallAPI.shared.fetchProfiles(excluding: model.user?.id, accessToken: token)
-    } catch {
-      model.error = "The community could not be loaded just now."
-    }
-    loading = false
-  }
-
-  private func start(_ person: ProfileRow) async throws {
-    guard let token = model.token else { return }
-    _ = try await LastCallAPI.shared.startConversation(targetID: person.id, accessToken: token)
-    await MainActor.run { model.tab = .messages }
   }
 }
 
 struct NewConversationSheet: View {
   let people: [ProfileRow]
   let action: (ProfileRow) -> Void
+  @Environment(\.dismiss) private var dismiss
 
   var body: some View {
     NavigationStack {
@@ -202,6 +177,7 @@ struct NewConversationSheet: View {
         ForEach(people) { person in
           Button {
             action(person)
+            dismiss()
           } label: {
             HStack(spacing: 10) {
               ProfileAvatar(profile: person, size: 40)
@@ -302,7 +278,7 @@ struct NativeProfile: View {
   }
 }
 
-private struct EditProfileSheet: View {
+struct EditProfileSheet: View {
   @EnvironmentObject private var model: NativeAppModel
   @Environment(\.dismiss) private var dismiss
   let profile: ProfileRow?
