@@ -9,236 +9,51 @@ struct NativeStoryDetail: View {
   @State private var draft = ""
   @State private var loadingComments = true
   @State private var sending = false
-
   var body: some View {
     NavigationStack {
       ScrollView(showsIndicators: false) {
         VStack(alignment: .leading, spacing: 16) {
-          NativeImage(url: story.imageURL)
-            .frame(height: 235)
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-          Text(story.category.uppercased())
-            .font(.system(size: 7, weight: .bold))
-            .tracking(1.3)
-            .foregroundStyle(Look.gold)
-          Text(story.title)
-            .font(.system(size: 29, weight: .bold, design: .serif))
-          Text("\(story.author) · \(story.location)")
-            .font(.system(size: 9))
-            .foregroundStyle(Look.muted)
-          Text(story.body)
-            .font(.system(size: 15, design: .serif))
-            .lineSpacing(5)
+          NativeImage(url: story.imageURL).frame(height: 235).clipShape(RoundedRectangle(cornerRadius: 14))
+          Text(story.category.uppercased()).font(.system(size: 7, weight: .bold)).tracking(1.3).foregroundStyle(Look.gold)
+          Text(story.title).font(.system(size: 29, weight: .bold, design: .serif))
+          Text("\(story.author) · \(story.location)").font(.system(size: 9)).foregroundStyle(Look.muted)
+          Text(story.body).font(.system(size: 15, design: .serif)).lineSpacing(5)
           HStack(spacing: 10) {
-            Button {
-              Task { await model.react(story) }
-            } label: {
-              Label(
-                "\(story.reactions + (model.reactions.contains(story.id) ? 1 : 0))",
-                systemImage: model.reactions.contains(story.id) ? "heart.fill" : "heart"
-              )
-            }
-            .buttonStyle(PrimaryButton())
-            ShareLink(item: story.title) {
-              Label("SHARE", systemImage: "paperplane")
-            }
-            .font(.system(size: 8, weight: .bold))
-            .foregroundStyle(Look.gold)
+            Button { Task { await model.react(story) } } label: { Label("\(story.reactions + (model.reactions.contains(story.id) ? 1 : 0))", systemImage: model.reactions.contains(story.id) ? "heart.fill" : "heart") }.buttonStyle(PrimaryButton())
+            ShareLink(item: story.title) { Label("SHARE", systemImage: "paperplane") }.font(.system(size: 8, weight: .bold)).foregroundStyle(Look.gold)
           }
           Divider().overlay(Look.line)
-          Text("COMMENTS")
-            .font(.system(size: 7, weight: .bold))
-            .tracking(1.2)
-            .foregroundStyle(Look.gold)
-          if loadingComments {
-            ProgressView().tint(Look.gold)
-          } else if comments.isEmpty {
-            Text("Be the first to leave a note.")
-              .font(.system(size: 10, design: .serif))
-              .foregroundStyle(Look.muted)
-          } else {
-            ForEach(comments) { comment in
-              VStack(alignment: .leading, spacing: 4) {
-                Text(authors[comment.userId]?.publicName ?? "LAST CALL member")
-                  .font(.system(size: 10, weight: .semibold))
-                Text(comment.body)
-                  .font(.system(size: 11, design: .serif))
-                Text(comment.dateValue.formatted(date: .abbreviated, time: .shortened))
-                  .font(.system(size: 7))
-                  .foregroundStyle(Look.muted)
-              }
-              .padding(10)
-              .frame(maxWidth: .infinity, alignment: .leading)
-              .background(Look.card)
-              .clipShape(RoundedRectangle(cornerRadius: 10))
-            }
-          }
-          if model.session {
-            HStack(spacing: 8) {
-              TextField("Leave a comment…", text: $draft, axis: .vertical)
-                .lineLimit(1...3)
-                .padding(10)
-                .background(Look.card)
-                .clipShape(RoundedRectangle(cornerRadius: 9))
-              Button {
-                sendComment()
-              } label: {
-                Image(systemName: "arrow.up.circle.fill")
-                  .font(.system(size: 26))
-              }
-              .foregroundStyle(Look.gold)
-              .disabled(sending || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            }
-          }
-        }
-        .padding(15)
-      }
-      .background(Look.black.ignoresSafeArea())
-      .foregroundStyle(Look.cream)
-      .toolbar {
-        ToolbarItem(placement: .topBarLeading) {
-          Button("Close") { dismiss() }
-            .foregroundStyle(Look.gold)
-        }
-      }
-      .task { await loadComments() }
+          Text("COMMENTS").font(.system(size: 7, weight: .bold)).tracking(1.2).foregroundStyle(Look.gold)
+          if loadingComments { ProgressView().tint(Look.gold) }
+          else if comments.isEmpty { Text("Be the first to leave a note.").font(.system(size: 10, design: .serif)).foregroundStyle(Look.muted) }
+          else { ForEach(comments) { comment in VStack(alignment: .leading, spacing: 4) { Text(authors[comment.userId]?.publicName ?? "LAST CALL member").font(.system(size: 10, weight: .semibold)); Text(comment.body).font(.system(size: 11, design: .serif)); Text(comment.dateValue.formatted(date: .abbreviated, time: .shortened)).font(.system(size: 7)).foregroundStyle(Look.muted) }.padding(10).frame(maxWidth: .infinity, alignment: .leading).background(Look.card).clipShape(RoundedRectangle(cornerRadius: 10)) } }
+          if model.session { HStack(spacing: 8) { TextField("Leave a comment…", text: $draft, axis: .vertical).lineLimit(1...3).padding(10).background(Look.card).clipShape(RoundedRectangle(cornerRadius: 9)); Button { sendComment() } label: { Image(systemName: "arrow.up.circle.fill").font(.system(size: 26)) }.foregroundStyle(Look.gold).disabled(sending || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) } }
+        }.padding(15)
+      }.background(Look.black.ignoresSafeArea()).foregroundStyle(Look.cream)
+        .toolbar { ToolbarItem(placement: .topBarLeading) { Button("Close") { dismiss() }.foregroundStyle(Look.gold) } }
+        .task { await loadComments() }
     }
   }
-
-  private func loadComments() async {
-    do {
-      comments = try await LastCallAPI.shared.fetchComments(
-        storyID: story.id, accessToken: model.token)
-      let ids = Array(Set(comments.map(\.userId)))
-      if !ids.isEmpty {
-        let profiles = try await LastCallAPI.shared.fetchProfiles(
-          ids: ids, accessToken: model.token ?? "")
-        authors = Dictionary(uniqueKeysWithValues: profiles.map { ($0.id, $0) })
-      }
-    } catch {
-      model.error = "Comments could not be loaded just now."
-    }
-    loadingComments = false
-  }
-
-  private func sendComment() {
-    let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !text.isEmpty, let token = model.token, let userID = model.user?.id else { return }
-    sending = true
-    Task {
-      do {
-        let comment = try await LastCallAPI.shared.addComment(
-          storyID: story.id,
-          userID: userID,
-          body: text,
-          accessToken: token
-        )
-        comments.append(comment)
-        authors[userID] = model.profile
-        draft = ""
-      } catch {
-        model.error = "Your comment could not be posted."
-      }
-      sending = false
-    }
-  }
+  private func loadComments() async { do { comments = try await LastCallAPI.shared.fetchComments(storyID: story.id, accessToken: model.token); let ids = Array(Set(comments.map(\.userId))); if !ids.isEmpty { let profiles = try await LastCallAPI.shared.fetchProfiles(ids: ids, accessToken: model.token ?? ""); authors = Dictionary(uniqueKeysWithValues: profiles.map { ($0.id, $0) }) } } catch { model.error = "Comments could not be loaded just now." }; loadingComments = false }
+  private func sendComment() { let text = draft.trimmingCharacters(in: .whitespacesAndNewlines); guard !text.isEmpty, let token = model.token, let userID = model.user?.id else { return }; sending = true; Task { do { let comment = try await LastCallAPI.shared.addComment(storyID: story.id, userID: userID, body: text, accessToken: token); comments.append(comment); authors[userID] = model.profile; draft = "" } catch { model.error = "Your comment could not be posted." }; sending = false } }
 }
 
 struct NativeCommunity: View {
   @EnvironmentObject private var model: NativeAppModel
   @State private var people: [ProfileRow] = []
   @State private var loading = true
-
-  var body: some View {
-    NavigationStack {
-      List {
-        if loading {
-          ProgressView().tint(Look.gold).listRowBackground(Look.black)
-        }
-        ForEach(people) { person in
-          HStack(spacing: 12) {
-            ProfileAvatar(profile: person, size: 44)
-            VStack(alignment: .leading, spacing: 3) {
-              Text(person.publicName).font(.system(size: 14, weight: .bold, design: .serif))
-              if let username = person.username, !username.isEmpty {
-                Text("@\(username)").font(.system(size: 8)).foregroundStyle(Look.gold)
-              }
-            }
-            Spacer()
-            Button {
-              Task { try? await start(person) }
-            } label: {
-              Image(systemName: "message")
-            }
-            .foregroundStyle(Look.gold)
-          }
-          .listRowBackground(Look.card)
-        }
-      }
-      .scrollContentBackground(.hidden)
-      .background(Look.black)
-      .foregroundStyle(Look.cream)
-      .navigationTitle("COMMUNITY")
-      .task { await load() }
-    }
-  }
-
-  private func load() async {
-    guard let token = model.token else {
-      loading = false
-      return
-    }
-    do {
-      people = try await LastCallAPI.shared.fetchProfiles(
-        excluding: model.user?.id, accessToken: token)
-    } catch {
-      model.error = "The community could not be loaded just now."
-    }
-    loading = false
-  }
-
-  private func start(_ person: ProfileRow) async throws {
-    guard let token = model.token else { return }
-    _ = try await LastCallAPI.shared.startConversation(targetID: person.id, accessToken: token)
-    await MainActor.run { model.tab = .messages }
-  }
+  var body: some View { NavigationStack { List { if loading { ProgressView().tint(Look.gold).listRowBackground(Look.black) }; ForEach(people) { person in HStack(spacing: 12) { ProfileAvatar(profile: person, size: 44); VStack(alignment: .leading, spacing: 3) { Text(person.publicName).font(.system(size: 14, weight: .bold, design: .serif)); if let username = person.username, !username.isEmpty { Text("@\(username)").font(.system(size: 8)).foregroundStyle(Look.gold) } }; Spacer(); Button { Task { try? await start(person) } } label: { Image(systemName: "message") }.foregroundStyle(Look.gold) }.listRowBackground(Look.card) } }.scrollContentBackground(.hidden).background(Look.black).foregroundStyle(Look.cream).navigationTitle("COMMUNITY").task { await load() } } }
+  private func load() async { guard let token = model.token else { loading = false; return }; do { people = try await LastCallAPI.shared.fetchProfiles(excluding: model.user?.id, accessToken: token) } catch { model.error = "The community could not be loaded just now." }; loading = false }
+  private func start(_ person: ProfileRow) async throws { guard let token = model.token else { return }; _ = try await LastCallAPI.shared.startConversation(targetID: person.id, accessToken: token); await MainActor.run { model.tab = .messages } }
 }
 
 struct NewConversationSheet: View {
   @Environment(\.dismiss) private var dismiss
   let people: [ProfileRow]
   let action: (ProfileRow) -> Void
-
-  var body: some View {
-    NavigationStack {
-      List(people) { person in
-        Button {
-          action(person)
-          dismiss()
-        } label: {
-          HStack(spacing: 10) {
-            ProfileAvatar(profile: person, size: 40)
-            Text(person.publicName).foregroundStyle(Look.cream)
-            Spacer()
-            Image(systemName: "message").foregroundStyle(Look.gold)
-          }
-        }
-        .listRowBackground(Look.card)
-      }
-      .scrollContentBackground(.hidden)
-      .background(Look.black)
-      .navigationTitle("NEW MESSAGE")
-      .toolbar {
-        ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } }
-      }
-    }
-  }
+  var body: some View { NavigationStack { List(people) { person in Button { action(person); dismiss() } label: { HStack(spacing: 10) { ProfileAvatar(profile: person, size: 40); Text(person.publicName).foregroundStyle(Look.cream); Spacer(); Image(systemName: "message").foregroundStyle(Look.gold) } }.listRowBackground(Look.card) }.scrollContentBackground(.hidden).background(Look.black).navigationTitle("NEW MESSAGE").toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } } }
 }
-
-struct ConversationRouter: View {
-  let conversation: ConversationRow
-  var body: some View { NativeChat(conversation: conversation) }
-}
+struct ConversationRouter: View { let conversation: ConversationRow; var body: some View { NativeChat(conversation: conversation) } }
 
 struct NativeProfile: View {
   @EnvironmentObject private var model: NativeAppModel
@@ -246,70 +61,25 @@ struct NativeProfile: View {
   @State private var showingCommunity = false
   @State private var editing = false
   @State private var stats = ProfileStats(stories: 0, followers: 0, following: 0)
-
   var body: some View {
     NavigationStack {
       ScrollView(showsIndicators: false) {
         VStack(spacing: 18) {
-          HStack {
-            Spacer()
-            Button {
-              notifications = true
-            } label: {
-              Image(systemName: model.unread > 0 ? "bell.badge.fill" : "bell")
-            }
-          }
-          .foregroundStyle(Look.gold)
-          .padding(.top, 8)
-          ProfileAvatar(profile: model.profile, size: 92)
-            .overlay(Circle().stroke(Look.gold, lineWidth: 2))
-          Text(model.profile?.publicName ?? model.user?.email ?? "LAST CALL member")
-            .font(.system(size: 26, weight: .bold, design: .serif))
-          if let username = model.profile?.username, !username.isEmpty {
-            Text("@\(username)").font(.system(size: 9)).foregroundStyle(Look.gold)
-          }
-          if let bio = model.profile?.bio, !bio.isEmpty {
-            Text(bio)
-              .font(.system(size: 11, design: .serif))
-              .foregroundStyle(Look.muted)
-              .multilineTextAlignment(.center)
-          }
-          HStack(spacing: 10) {
-            Stat(value: "\(stats.stories)", label: "STORIES")
-            Stat(value: "\(stats.followers)", label: "FOLLOWERS")
-            Stat(value: "\(stats.following)", label: "FOLLOWING")
-          }
-          VStack(spacing: 9) {
-            Button("EDIT PROFILE") { editing = true }.buttonStyle(PrimaryButton())
-            Button("THE COMMUNITY") { showingCommunity = true }.buttonStyle(OutlineButton())
-            Button("SIGN OUT") { model.signOut() }.buttonStyle(OutlineButton())
-          }
-        }
-        .padding(18)
-      }
-      .background(Look.black.ignoresSafeArea())
-      .foregroundStyle(Look.cream)
-      .navigationTitle("PROFILE")
-      .navigationBarTitleDisplayMode(.inline)
-      .sheet(isPresented: $notifications) { NativeNotifications() }
-      .sheet(isPresented: $showingCommunity) { NativeCommunity() }
-      .sheet(isPresented: $editing) {
-        EditProfileSheet(profile: model.profile) { updated in model.profile = updated }
-      }
-      .task { await load() }
-      .refreshable { await load() }
+          HStack { VStack(alignment: .leading, spacing: 2) { Text("LAST CALL").font(.system(size: 10, weight: .bold)).tracking(2).foregroundStyle(Look.gold); Text("YOUR PROFILE").font(.system(size: 7, weight: .bold)).tracking(1.2).foregroundStyle(Look.muted) }; Spacer(); Button { notifications = true } label: { Image(systemName: model.unread > 0 ? "bell.badge.fill" : "bell") } }.foregroundStyle(Look.gold).padding(.top, 8)
+          LastCallProfilePhotoPicker()
+          Text(model.profile?.publicName ?? model.user?.email ?? "LAST CALL member").font(.system(size: 26, weight: .bold, design: .serif))
+          if let username = model.profile?.username, !username.isEmpty { Text("@\(username)").font(.system(size: 9)).foregroundStyle(Look.gold) }
+          if let bio = model.profile?.bio, !bio.isEmpty { Text(bio).font(.system(size: 11, design: .serif)).foregroundStyle(Look.muted).multilineTextAlignment(.center) }
+          if let location = model.profile?.location, !location.isEmpty { Label(location, systemImage: "mappin.and.ellipse").font(.system(size: 8, weight: .medium)).foregroundStyle(Look.muted) }
+          HStack(spacing: 10) { Stat(value: "\(stats.stories)", label: "STORIES"); Stat(value: "\(stats.followers)", label: "FOLLOWERS"); Stat(value: "\(stats.following)", label: "FOLLOWING") }
+          VStack(spacing: 9) { Button("EDIT PROFILE") { editing = true }.buttonStyle(PrimaryButton()); Button("THE COMMUNITY") { showingCommunity = true }.buttonStyle(OutlineButton()); Button("SIGN OUT") { model.signOut() }.buttonStyle(OutlineButton()) }
+        }.padding(18)
+      }.background(Look.black.ignoresSafeArea()).foregroundStyle(Look.cream).navigationBarHidden(true)
+        .sheet(isPresented: $notifications) { NativeNotifications() }.sheet(isPresented: $showingCommunity) { NativeCommunity() }.sheet(isPresented: $editing) { EditProfileSheet(profile: model.profile) { updated in model.profile = updated } }
+        .task { await load() }.refreshable { await load() }
     }
   }
-
-  private func load() async {
-    await model.refreshAccount()
-    guard let token = model.token, let userID = model.user?.id else { return }
-    do {
-      stats = try await LastCallAPI.shared.fetchProfileStats(userID: userID, accessToken: token)
-    } catch {
-      model.error = "Profile stats could not be loaded just now."
-    }
-  }
+  private func load() async { await model.refreshAccount(); guard let token = model.token, let userID = model.user?.id else { return }; do { stats = try await LastCallAPI.shared.fetchProfileStats(userID: userID, accessToken: token) } catch { model.error = "Profile stats could not be loaded just now." } }
 }
 
 private struct EditProfileSheet: View {
@@ -321,62 +91,19 @@ private struct EditProfileSheet: View {
   @State private var username = ""
   @State private var bio = ""
   @State private var saving = false
-
   var body: some View {
     NavigationStack {
       Form {
-        Section("PROFILE") {
-          TextField("Display name", text: $name)
-          TextField("Username", text: $username)
-            .textInputAutocapitalization(.never)
-            .autocorrectionDisabled()
-          TextEditor(text: $bio).frame(minHeight: 120)
+        Section("PROFILE PHOTO") {
+          HStack(spacing: 14) { LastCallProfilePhotoPicker().scaleEffect(0.62).frame(width: 58, height: 58); VStack(alignment: .leading, spacing: 4) { Text("Your profile photo").font(.system(size: 13, weight: .semibold, design: .serif)); Text("Tap the photo to choose a new one.").font(.system(size: 9)).foregroundStyle(Look.muted) } }.listRowBackground(Look.card)
         }
-        Section {
-          Text("Your avatar can be added when profile media upload is enabled.")
-            .font(.footnote)
-            .foregroundStyle(Look.muted)
-        }
-      }
-      .scrollContentBackground(.hidden)
-      .background(Look.black)
-      .foregroundStyle(Look.cream)
-      .navigationTitle("EDIT PROFILE")
-      .toolbar {
-        ToolbarItem(placement: .topBarLeading) { Button("Cancel") { dismiss() } }
-        ToolbarItem(placement: .topBarTrailing) {
-          Button(saving ? "Saving…" : "Save") { save() }.disabled(saving)
-        }
-      }
-      .onAppear {
-        name = profile?.displayName ?? ""
-        username = profile?.username ?? ""
-        bio = profile?.bio ?? ""
-      }
+        Section("PROFILE") { TextField("Display name", text: $name); TextField("Username", text: $username).textInputAutocapitalization(.never).autocorrectionDisabled(); TextEditor(text: $bio).frame(minHeight: 120) }
+      }.scrollContentBackground(.hidden).background(Look.black).foregroundStyle(Look.cream).navigationTitle("EDIT PROFILE")
+        .toolbar { ToolbarItem(placement: .topBarLeading) { Button("Cancel") { dismiss() } }; ToolbarItem(placement: .topBarTrailing) { Button(saving ? "Saving…" : "Save") { save() }.disabled(saving) } }
+        .onAppear { name = profile?.displayName ?? ""; username = profile?.username ?? ""; bio = profile?.bio ?? "" }
     }
   }
-
-  private func save() {
-    guard let token = model.token, let userID = model.user?.id else { return }
-    saving = true
-    Task {
-      do {
-        if let updated = try await LastCallAPI.shared.updateProfile(
-          userID: userID,
-          displayName: name.trimmingCharacters(in: .whitespacesAndNewlines),
-          username: username.trimmingCharacters(in: .whitespacesAndNewlines),
-          bio: bio.trimmingCharacters(in: .whitespacesAndNewlines),
-          accessToken: token
-        ) {
-          onSaved(updated)
-        }
-        dismiss()
-      } catch {
-        model.error = "Your profile could not be saved."
-      }
-      saving = false
-    }
-  }
+  private func save() { guard let token = model.token, let userID = model.user?.id else { return }; saving = true; Task { do { if let updated = try await LastCallAPI.shared.updateProfile(userID: userID, displayName: name.trimmingCharacters(in: .whitespacesAndNewlines), username: username.trimmingCharacters(in: .whitespacesAndNewlines), bio: bio.trimmingCharacters(in: .whitespacesAndNewlines), accessToken: token) { onSaved(updated) }; dismiss() } catch { model.error = "Your profile could not be saved." }; saving = false } }
 }
 
 struct NativeNotifications: View {
@@ -384,123 +111,15 @@ struct NativeNotifications: View {
   @Environment(\.dismiss) private var dismiss
   @State private var items: [NotificationRow] = []
   @State private var loading = true
-
-  var body: some View {
-    NavigationStack {
-      List {
-        if loading {
-          ProgressView().tint(Look.gold).listRowBackground(Look.black)
-        }
-        if !loading && items.isEmpty {
-          Text("You're all caught up.")
-            .foregroundStyle(Look.muted)
-            .listRowBackground(Look.black)
-        }
-        ForEach(items) { item in
-          HStack(spacing: 12) {
-            Image(systemName: icon(for: item.type))
-              .foregroundStyle(Look.gold)
-              .frame(width: 26)
-            VStack(alignment: .leading, spacing: 3) {
-              Text(title(for: item.type))
-                .font(.system(size: 12, weight: .semibold, design: .serif))
-              Text(item.dateValue.formatted(date: .abbreviated, time: .shortened))
-                .font(.system(size: 8))
-                .foregroundStyle(Look.muted)
-            }
-            Spacer()
-            if item.readAt == nil {
-              Circle().fill(Look.gold).frame(width: 7, height: 7)
-            }
-          }
-          .listRowBackground(Look.card)
-        }
-      }
-      .scrollContentBackground(.hidden)
-      .background(Look.black)
-      .foregroundStyle(Look.cream)
-      .navigationTitle("NOTIFICATIONS")
-      .toolbar {
-        ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } }
-      }
-      .task { await load() }
-      .refreshable { await load() }
-    }
-  }
-
-  private func load() async {
-    guard let token = model.token, let userID = model.user?.id else {
-      loading = false
-      return
-    }
-    do {
-      items = try await LastCallAPI.shared.fetchNotifications(userID: userID, accessToken: token)
-      if items.contains(where: { $0.readAt == nil }) {
-        try? await LastCallAPI.shared.markNotificationsRead(userID: userID, accessToken: token)
-        model.unread = 0
-      }
-    } catch {
-      model.error = "Notifications could not be loaded just now."
-    }
-    loading = false
-  }
-
-  private func icon(for type: String) -> String {
-    let value = type.lowercased()
-    if value.contains("message") { return "message.fill" }
-    if value.contains("follow") { return "person.badge.plus" }
-    if value.contains("reaction") || value.contains("beer") { return "mug.fill" }
-    if value.contains("comment") { return "bubble.right.fill" }
-    return "bell.fill"
-  }
-
-  private func title(for type: String) -> String {
-    let value = type.lowercased()
-    if value.contains("message") { return "You have a new message." }
-    if value.contains("follow") { return "Someone followed you." }
-    if value.contains("reaction") || value.contains("beer") {
-      return "Someone raised a pint to your story."
-    }
-    if value.contains("comment") { return "Someone commented on your story." }
-    return "You have a new LAST CALL notification."
-  }
+  var body: some View { NavigationStack { List { if loading { ProgressView().tint(Look.gold).listRowBackground(Look.black) }; if !loading && items.isEmpty { Text("You're all caught up.").foregroundStyle(Look.muted).listRowBackground(Look.black) }; ForEach(items) { item in HStack(spacing: 12) { Image(systemName: icon(for: item.type)).foregroundStyle(Look.gold).frame(width: 26); VStack(alignment: .leading, spacing: 3) { Text(title(for: item.type)).font(.system(size: 12, weight: .semibold, design: .serif)); Text(item.dateValue.formatted(date: .abbreviated, time: .shortened)).font(.system(size: 8)).foregroundStyle(Look.muted) }; Spacer(); if item.readAt == nil { Circle().fill(Look.gold).frame(width: 7, height: 7) } }.listRowBackground(Look.card) } }.scrollContentBackground(.hidden).background(Look.black).foregroundStyle(Look.cream).navigationTitle("NOTIFICATIONS").toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }.task { await load() }.refreshable { await load() } } }
+  private func load() async { guard let token = model.token, let userID = model.user?.id else { loading = false; return }; do { items = try await LastCallAPI.shared.fetchNotifications(userID: userID, accessToken: token); if items.contains(where: { $0.readAt == nil }) { try? await LastCallAPI.shared.markNotificationsRead(userID: userID, accessToken: token); model.unread = 0 } } catch { model.error = "Notifications could not be loaded just now." }; loading = false }
+  private func icon(for type: String) -> String { let value = type.lowercased(); if value.contains("message") { return "message.fill" }; if value.contains("follow") { return "person.badge.plus" }; if value.contains("reaction") || value.contains("beer") { return "mug.fill" }; if value.contains("comment") { return "bubble.right.fill" }; return "bell.fill" }
+  private func title(for type: String) -> String { let value = type.lowercased(); if value.contains("message") { return "You have a new message." }; if value.contains("follow") { return "Someone followed you." }; if value.contains("reaction") || value.contains("beer") { return "Someone raised a pint to your story." }; if value.contains("comment") { return "Someone commented on your story." }; return "You have a new LAST CALL notification." }
 }
 
 struct ProfileAvatar: View {
   let profile: ProfileRow?
   let size: CGFloat
-
-  var body: some View {
-    Group {
-      if let raw = profile?.avatarURL, !raw.isEmpty, let url = URL(string: raw) {
-        AsyncImage(url: url) { phase in
-          if case .success(let image) = phase {
-            image.resizable().scaledToFill()
-          } else {
-            LastCallAvatar()
-          }
-        }
-      } else {
-        LastCallAvatar()
-      }
-    }
-    .frame(width: size, height: size)
-    .clipShape(Circle())
-  }
+  var body: some View { Group { if let raw = profile?.avatarURL, !raw.isEmpty, let url = URL(string: raw) { AsyncImage(url: url) { phase in if case .success(let image) = phase { image.resizable().scaledToFill() } else { LastCallAvatar() } } } else { LastCallAvatar() } }.frame(width: size, height: size).clipShape(Circle()) }
 }
-
-struct Stat: View {
-  let value: String
-  let label: String
-
-  var body: some View {
-    VStack(spacing: 3) {
-      Text(value).font(.system(size: 18, weight: .bold, design: .serif))
-      Text(label).font(.system(size: 6, weight: .bold)).tracking(1).foregroundStyle(Look.muted)
-    }
-    .frame(maxWidth: .infinity)
-    .padding(.vertical, 13)
-    .background(Look.card)
-    .clipShape(RoundedRectangle(cornerRadius: 10))
-  }
-}
+struct Stat: View { let value: String; let label: String; var body: some View { VStack(spacing: 3) { Text(value).font(.system(size: 18, weight: .bold, design: .serif)); Text(label).font(.system(size: 6, weight: .bold)).tracking(1).foregroundStyle(Look.muted) }.frame(maxWidth: .infinity).padding(.vertical, 13).background(Look.card).clipShape(RoundedRectangle(cornerRadius: 10)) } }
