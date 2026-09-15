@@ -15,7 +15,13 @@ struct CommunityHome: View {
           feed
         }
       }
-      .background(Look.black.ignoresSafeArea())
+      .background(
+        LinearGradient(
+          colors: [Color(red: 0.055, green: 0.08, blue: 0.065), Look.black],
+          startPoint: .top,
+          endPoint: .center
+        ).ignoresSafeArea()
+      )
       .foregroundStyle(Look.cream)
       .navigationBarHidden(true)
       .refreshable { await model.refreshStories() }
@@ -27,31 +33,25 @@ struct CommunityHome: View {
 
   private var topBar: some View {
     HStack(spacing: 12) {
-      Button {
-        model.tab = .profile
-      } label: {
-        ProfileAvatar(profile: model.profile, size: 38)
-          .overlay(Circle().stroke(Look.gold, lineWidth: 1))
+      Button { model.tab = .profile } label: {
+        ProfileAvatar(profile: model.profile, size: 40)
+          .overlay(Circle().stroke(Look.gold, lineWidth: 1.5))
       }
       Spacer()
-      VStack(spacing: 1) {
+      VStack(spacing: -1) {
         Text("LAST CALL")
           .font(.system(size: 22, weight: .black, design: .rounded))
-          .tracking(-0.8)
+          .tracking(-1.1)
         CheersPintsMarkForFeed()
-          .frame(width: 34, height: 19)
+          .frame(width: 36, height: 19)
           .foregroundStyle(.white)
       }
       Spacer()
-      HStack(spacing: 16) {
-        Button {
-          model.tab = .discover
-        } label: {
+      HStack(spacing: 17) {
+        Button { model.tab = .discover } label: {
           Image(systemName: "magnifyingglass")
         }
-        Button {
-          showNotifications = true
-        } label: {
+        Button { showNotifications = true } label: {
           ZStack(alignment: .topTrailing) {
             Image(systemName: "bell")
             if model.unread > 0 {
@@ -64,65 +64,86 @@ struct CommunityHome: View {
     .font(.system(size: 19, weight: .medium))
     .padding(.horizontal, 15)
     .padding(.top, 8)
-    .padding(.bottom, 10)
+    .padding(.bottom, 12)
   }
 
   private var storyStrip: some View {
-    Group {
-      if !model.stories.isEmpty {
-        ScrollView(.horizontal, showsIndicators: false) {
-          HStack(spacing: 13) {
-            ForEach(Array(model.stories.prefix(8))) { story in
-              Button {
-                selected = story
-              } label: {
-                VStack(spacing: 5) {
-                  Circle()
-                    .stroke(Look.gold, lineWidth: 2)
-                    .frame(width: 65, height: 65)
-                    .overlay {
-                      if let avatar = story.authorAvatarURL {
-                        NativeImage(url: avatar).clipShape(Circle()).padding(3)
-                      } else {
-                        LastCallAvatar().padding(8)
-                      }
-                    }
-                  Text(story.author)
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundStyle(Look.cream)
-                    .lineLimit(1)
-                }
-                .frame(width: 72)
-              }
-              .buttonStyle(.plain)
+    ScrollView(.horizontal, showsIndicators: false) {
+      HStack(spacing: 13) {
+        Button { model.tab = .write } label: {
+          VStack(spacing: 5) {
+            ZStack(alignment: .bottomTrailing) {
+              Circle()
+                .fill(Look.card)
+                .frame(width: 65, height: 65)
+                .overlay(Circle().stroke(Look.gold, lineWidth: 2))
+              ProfileAvatar(profile: model.profile, size: 57)
+                .overlay(Circle().stroke(Look.black, lineWidth: 2))
+              Circle()
+                .fill(.white)
+                .frame(width: 21, height: 21)
+                .overlay(Image(systemName: "plus").font(.system(size: 12, weight: .bold)).foregroundStyle(Look.black))
+                .offset(x: 1, y: 1)
             }
+            Text("Your story")
+              .font(.system(size: 9, weight: .semibold))
+              .foregroundStyle(Look.cream)
+              .lineLimit(1)
           }
-          .padding(.horizontal, 15)
+          .frame(width: 72)
         }
-        .padding(.bottom, 12)
+        .buttonStyle(.plain)
+
+        ForEach(Array(model.stories.prefix(8))) { story in
+          Button { selected = story } label: {
+            VStack(spacing: 5) {
+              Circle()
+                .stroke(Look.gold, lineWidth: 2)
+                .frame(width: 65, height: 65)
+                .overlay {
+                  if let avatar = story.authorAvatarURL {
+                    NativeImage(url: avatar).clipShape(Circle()).padding(3)
+                  } else {
+                    LastCallAvatar().padding(8)
+                  }
+                }
+              Text(story.author)
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(Look.cream)
+                .lineLimit(1)
+            }
+            .frame(width: 72)
+          }
+          .buttonStyle(.plain)
+        }
       }
+      .padding(.horizontal, 15)
     }
+    .padding(.bottom, 12)
   }
 
   private var composer: some View {
-    HStack(spacing: 10) {
-      ProfileAvatar(profile: model.profile, size: 40)
-      Text("What's on your mind?")
-        .font(.system(size: 14))
-        .foregroundStyle(Look.muted)
-      Spacer()
-      Image(systemName: "photo.on.rectangle")
+    Button { model.tab = .write } label: {
+      HStack(spacing: 10) {
+        ProfileAvatar(profile: model.profile, size: 40)
+        Text("What's on your mind?")
+          .font(.system(size: 14, design: .rounded))
+          .foregroundStyle(Look.muted)
+        Spacer()
+        Image(systemName: "photo.on.rectangle")
+          .font(.system(size: 17, weight: .medium))
+          .foregroundStyle(Look.gold)
+      }
+      .foregroundStyle(Look.cream)
+      .padding(.horizontal, 13)
+      .frame(height: 58)
+      .background(Look.card)
+      .clipShape(Capsule())
+      .overlay(Capsule().stroke(Look.line))
     }
-    .foregroundStyle(Look.cream)
-    .padding(.horizontal, 13)
-    .frame(height: 58)
-    .background(Look.card)
-    .clipShape(Capsule())
-    .overlay(Capsule().stroke(Look.line))
+    .buttonStyle(.plain)
     .padding(.horizontal, 14)
-    .padding(.bottom, 9)
-    .contentShape(Rectangle())
-    .onTapGesture { model.tab = .write }
+    .padding(.bottom, 10)
   }
 
   private var feed: some View {
@@ -130,10 +151,13 @@ struct CommunityHome: View {
       if model.stories.isEmpty {
         VStack(alignment: .leading, spacing: 7) {
           Text("No published stories yet.")
-            .font(.system(size: 15, weight: .semibold, design: .serif))
+            .font(.system(size: 16, weight: .semibold, design: .serif))
           Text("Be the first to share the craic behind the bar.")
             .font(.system(size: 12, design: .serif))
             .foregroundStyle(Look.muted)
+          Button("WRITE A STORY") { model.tab = .write }
+            .buttonStyle(PrimaryButton())
+            .padding(.top, 5)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(20)
@@ -175,10 +199,17 @@ private struct CommunityPost: View {
         }
         Spacer()
         Image(systemName: "ellipsis")
+          .foregroundStyle(Look.muted)
       }
       Text(story.title)
         .font(.system(size: 15, weight: .medium, design: .serif))
         .lineLimit(2)
+      if !story.body.isEmpty {
+        Text(story.body)
+          .font(.system(size: 12, design: .serif))
+          .foregroundStyle(Look.muted)
+          .lineLimit(3)
+      }
       Button(action: open) {
         NativeImage(url: story.imageURL)
           .frame(maxWidth: .infinity)
@@ -199,8 +230,12 @@ private struct CommunityPost: View {
             Text("\(story.comments)")
           }
         }
-        ShareLink(item: story.title) { Image(systemName: "paperplane") }
+        ShareLink(item: story.title) {
+          Image(systemName: "paperplane")
+        }
         Spacer()
+        Image(systemName: "bookmark")
+          .foregroundStyle(Look.muted)
       }
       .font(.system(size: 18))
       .foregroundStyle(Look.cream)
