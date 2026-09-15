@@ -1,0 +1,46 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 1024 1024] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 324 >>
+stream
+q
+0.03 0.03 0.025 rg
+0 0 1024 1024 re f
+0.84 0.70 0.34 rg
+300 470 150 210 re f
+300 650 150 45 re f
+450 625 65 80 re S
+574 470 150 210 re f
+574 650 150 45 re f
+509 625 65 80 re S
+0.95 0.92 0.85 rg
+BT /F1 72 Tf 1 0 0 1 285 350 Tm (LAST CALL) Tj ET
+0.84 0.70 0.34 rg
+BT /F1 24 Tf 1 0 0 1 420 310 Tm (THAT'S THE CRAIC.) Tj ET
+Q
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000243 00000 n 
+0000000617 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+692
+%%EOF
