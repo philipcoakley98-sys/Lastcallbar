@@ -177,9 +177,14 @@ struct CommunityHome: View {
 
 private struct CommunityPost: View {
   @EnvironmentObject private var model: NativeAppModel
+  @AppStorage("lastcall.savedStoryIDs") private var savedStoryIDs = ""
   let story: NativeStory
   let open: () -> Void
   let react: () -> Void
+
+  private var saved: Bool {
+    savedStoryIDs.split(separator: ",").contains(Substring(story.id.uuidString))
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 9) {
@@ -198,8 +203,6 @@ private struct CommunityPost: View {
           Text(story.location).font(.system(size: 8)).foregroundStyle(Look.muted)
         }
         Spacer()
-        Image(systemName: "ellipsis")
-          .foregroundStyle(Look.muted)
       }
       Text(story.title)
         .font(.system(size: 15, weight: .medium, design: .serif))
@@ -234,14 +237,29 @@ private struct CommunityPost: View {
           Image(systemName: "paperplane")
         }
         Spacer()
-        Image(systemName: "bookmark")
-          .foregroundStyle(Look.muted)
+        Button {
+          toggleSaved()
+        } label: {
+          Image(systemName: saved ? "bookmark.fill" : "bookmark")
+        }
+        .accessibilityLabel(saved ? "Remove bookmark" : "Save story")
       }
       .font(.system(size: 18))
       .foregroundStyle(Look.cream)
     }
     .padding(.horizontal, 14)
     .padding(.vertical, 12)
+  }
+
+  private func toggleSaved() {
+    var ids = savedStoryIDs.split(separator: ",").map(String.init)
+    let id = story.id.uuidString
+    if let index = ids.firstIndex(of: id) {
+      ids.remove(at: index)
+    } else {
+      ids.append(id)
+    }
+    savedStoryIDs = ids.joined(separator: ",")
   }
 }
 
