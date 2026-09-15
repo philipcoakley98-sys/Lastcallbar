@@ -19,7 +19,7 @@ struct NativeAuth: View {
   }
 
   private var canSubmit: Bool {
-    !working && isValidEmail(trimmedEmail) && password.count >= 6
+    !working && !trimmedEmail.isEmpty && password.count >= 6
   }
 
   var body: some View {
@@ -165,8 +165,8 @@ struct NativeAuth: View {
   private func submit() {
     localError = nil
     let normalized = trimmedEmail
-    guard isValidEmail(normalized) else {
-      localError = "Enter a valid email address."
+    guard !normalized.isEmpty else {
+      localError = "Enter your email address."
       return
     }
     guard password.count >= 6 else {
@@ -183,13 +183,6 @@ struct NativeAuth: View {
       }
       working = false
     }
-  }
-
-  private func isValidEmail(_ value: String) -> Bool {
-    guard value.count >= 5, value.contains("@"), value.contains(".") else { return false }
-    let parts = value.split(separator: "@", omittingEmptySubsequences: false)
-    guard parts.count == 2, !parts[0].isEmpty, !parts[1].isEmpty else { return false }
-    return parts[1].contains(".") && !parts[1].hasPrefix(".") && !parts[1].hasSuffix(".")
   }
 }
 
