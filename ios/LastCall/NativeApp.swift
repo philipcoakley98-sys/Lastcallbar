@@ -200,22 +200,22 @@ enum NativeTab: String, CaseIterable {
 
 struct NativeRootView: View {
   @EnvironmentObject private var model: NativeAppModel
+
   var body: some View {
     Group {
       if model.session {
-        TabView(selection: $model.tab) {
-          CommunityHome().tag(NativeTab.home).tabItem { Label("Home", systemImage: "house.fill") }
-          ExploreView().tag(NativeTab.discover).tabItem { Label("Explore", systemImage: "safari") }
-          NativeWrite().tag(NativeTab.write).tabItem {
-            Label("Write", systemImage: "plus.circle.fill")
+        Group {
+          switch model.tab {
+          case .home: CommunityHome()
+          case .discover: ExploreView()
+          case .write: NativeWrite()
+          case .messages: LastCallMessages()
+          case .profile: NativeProfile()
           }
-          LastCallMessages().tag(NativeTab.messages).tabItem {
-            Label("Messages", systemImage: "message.fill")
-          }
-          NativeProfile().tag(NativeTab.profile).tabItem {
-            Label("Profile", systemImage: "person.crop.circle")
-          }
-        }.tint(Look.gold)
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+          LastCallBottomBar()
+        }
       } else {
         LockedHome()
       }
@@ -230,6 +230,60 @@ struct NativeRootView: View {
     } message: {
       Text(model.error ?? "")
     }
+  }
+}
+
+struct LastCallBottomBar: View {
+  @EnvironmentObject private var model: NativeAppModel
+
+  var body: some View {
+    HStack(spacing: 0) {
+      bottomItem(.home, icon: "house.fill", label: "Home")
+      bottomItem(.discover, icon: "safari", label: "Explore")
+      Button {
+        model.tab = .write
+      } label: {
+        ZStack {
+          Circle().fill(.white).frame(width: 58, height: 58)
+          Image(systemName: "plus")
+            .font(.system(size: 25, weight: .medium))
+            .foregroundStyle(Look.black)
+        }
+      }
+      .frame(maxWidth: .infinity)
+      bottomItem(.messages, icon: "message.fill", label: "Messages", badge: model.unread)
+      bottomItem(.profile, icon: "person.fill", label: "Profile")
+    }
+    .frame(height: 70)
+    .padding(.horizontal, 7)
+    .padding(.top, 4)
+    .background(.black.opacity(0.96))
+    .overlay(alignment: .top) { Rectangle().fill(.white.opacity(0.08)).frame(height: 1) }
+  }
+
+  @ViewBuilder
+  private func bottomItem(_ tab: NativeTab, icon: String, label: String, badge: Int = 0) -> some View {
+    Button { model.tab = tab } label: {
+      VStack(spacing: 3) {
+        ZStack(alignment: .topTrailing) {
+          Image(systemName: model.tab == tab ? icon : icon.replacingOccurrences(of: ".fill", with: ""))
+            .font(.system(size: 20, weight: .medium))
+          if badge > 0 {
+            Text(badge > 9 ? "9+" : "\(badge)")
+              .font(.system(size: 7, weight: .bold))
+              .foregroundStyle(.white)
+              .padding(3)
+              .background(.red)
+              .clipShape(Circle())
+              .offset(x: 8, y: -7)
+          }
+        }
+        Text(label).font(.system(size: 9, weight: model.tab == tab ? .bold : .medium))
+      }
+      .foregroundStyle(model.tab == tab ? .white : .white.opacity(0.58))
+      .frame(maxWidth: .infinity)
+    }
+    .buttonStyle(.plain)
   }
 }
 
@@ -279,17 +333,9 @@ struct NativeHeader: View {
     HStack {
       Text("LAST CALL").font(.system(size: 15, weight: .bold, design: .serif)).tracking(2.4)
       Spacer()
-      Button {
-        model.tab = .discover
-      } label: {
-        Image(systemName: "magnifyingglass")
-      }
+      Button { model.tab = .discover } label: { Image(systemName: "magnifyingglass") }
       if model.session {
-        Button {
-          model.tab = .profile
-        } label: {
-          ProfileAvatar(profile: model.profile, size: 27)
-        }
+        Button { model.tab = .profile } label: { ProfileAvatar(profile: model.profile, size: 27) }
       }
     }.foregroundStyle(Look.cream).padding(.top, 6)
   }
@@ -308,41 +354,94 @@ struct NativeWrite: View {
   @State private var photo: PhotosPickerItem?
   @State private var imageData: Data?
   let categories = ["Closing Time", "After Hours", "Bar Wisdom", "Staff Hours"]
+
   var body: some View {
     NavigationStack {
-      ScrollView {
-        VStack(alignment: .leading, spacing: 12) {
-          Text("Tell us your story").font(.system(size: 31, weight: .bold, design: .serif))
-          Text("Funny, strange, heartwarming, unforgettable — whatever stayed with you.").font(
-            .system(size: 12, design: .serif)
-          ).foregroundStyle(Look.muted)
-          TextField("Story title", text: $title).textFieldStyle(LCField())
-          TextEditor(text: $bodyText).frame(minHeight: 230).scrollContentBackground(.hidden)
-            .padding(8).background(Look.card).clipShape(RoundedRectangle(cornerRadius: 10)).overlay(
-              RoundedRectangle(cornerRadius: 10).stroke(Look.line))
-          Picker("Category", selection: $category) {
-            ForEach(categories, id: \.self, content: Text.init)
-          }.pickerStyle(.menu)
+      ScrollView(showsIndicators: false) {
+        VStack(alignment: .leading, spacing: 14) {
           HStack {
-            TextField("City", text: $city).textFieldStyle(LCField())
-            TextField("Country", text: $country).textFieldStyle(LCField())
+            VStack(alignment: .leading, spacing: 4) {
+              Text("Write a story").font(.system(size: 29, weight: .bold, design: .serif))
+              Text("Real nights. Real people. Last call.")
+                .font(.system(size: 11, design: .serif)).foregroundStyle(Look.muted)
+            }
+            Spacer()
           }
-          Toggle("Post anonymously", isOn: $anonymous).tint(Look.green)
+
+          TextField("Story title", text: $title)
+            .textFieldStyle(LCField())
+
+          ZStack(alignment: .topLeading) {
+            TextEditor(text: $bodyText)
+              .frame(minHeight: 210)
+              .scrollContentBackground(.hidden)
+              .padding(7)
+            if bodyText.isEmpty {
+              Text("What happened behind the bar?")
+                .foregroundStyle(Look.muted)
+                .padding(.horizontal, 13)
+                .padding(.top, 15)
+                .allowsHitTesting(false)
+            }
+          }
+          .background(Look.card)
+          .clipShape(RoundedRectangle(cornerRadius: 12))
+          .overlay(RoundedRectangle(cornerRadius: 12).stroke(Look.line))
+
           PhotosPicker(selection: $photo, matching: .images) {
-            Label(imageData == nil ? "ADD STORY PHOTO" : "PHOTO READY", systemImage: "photo").font(
-              .system(size: 9, weight: .bold)
-            ).foregroundStyle(Look.gold).padding(11).frame(maxWidth: .infinity).background(
-              Look.card
-            ).clipShape(RoundedRectangle(cornerRadius: 9))
-          }.onChange(of: photo) { _, item in
+            HStack(spacing: 10) {
+              Image(systemName: "camera")
+              Text(imageData == nil ? "Add a photo (optional)" : "Photo added")
+              Spacer()
+              Image(systemName: imageData == nil ? "plus" : "checkmark")
+            }
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(.white)
+            .padding(15)
+            .background(Look.card)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Look.line))
+          }
+          .onChange(of: photo) { _, item in
             guard let item else { return }
             Task { imageData = try? await item.loadTransferable(type: Data.self) }
           }
+
           if let imageData, let image = UIImage(data: imageData) {
-            Image(uiImage: image).resizable().scaledToFill().frame(height: 180).clipShape(
-              RoundedRectangle(cornerRadius: 12))
+            Image(uiImage: image)
+              .resizable().scaledToFill().frame(height: 175).clipShape(RoundedRectangle(cornerRadius: 12))
           }
-          Button(sending ? "SENDING…" : "SUBMIT STORY →") {
+
+          VStack(spacing: 10) {
+            HStack {
+              Image(systemName: "mappin.and.ellipse")
+              TextField("Add location (optional)", text: $city)
+              Spacer()
+            }
+            .foregroundStyle(.white)
+            .padding(13)
+            .background(Look.card)
+            .clipShape(RoundedRectangle(cornerRadius: 11))
+
+            HStack {
+              Image(systemName: "tag")
+              Picker("Category", selection: $category) {
+                ForEach(categories, id: \.self) { Text($0) }
+              }
+              .pickerStyle(.menu)
+              Spacer()
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 10)
+            .background(Look.card)
+            .clipShape(RoundedRectangle(cornerRadius: 11))
+          }
+
+          Toggle("Post anonymously", isOn: $anonymous)
+            .tint(Look.green)
+            .font(.system(size: 12, weight: .medium))
+
+          Button {
             sending = true
             Task {
               let success = await model.submit(
@@ -359,16 +458,23 @@ struct NativeWrite: View {
                 photo = nil
               }
             }
-          }.buttonStyle(PrimaryButton()).disabled(
-            sending || bodyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-          if done {
-            Text("Thanks — your story has been sent for review.").font(
-              .system(size: 9, weight: .semibold)
-            ).foregroundStyle(Look.gold)
+          } label: {
+            Text(sending ? "Posting…" : "Post story")
+              .frame(maxWidth: .infinity).frame(height: 52)
           }
-        }.padding(13)
-      }.background(Look.black.ignoresSafeArea()).foregroundStyle(Look.cream).navigationBarHidden(
-        true)
+          .buttonStyle(PrimaryButton())
+          .disabled(sending || bodyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+          if done {
+            Text("Your story has been sent for review.")
+              .font(.system(size: 10, weight: .semibold)).foregroundStyle(Look.gold)
+          }
+        }
+        .padding(.horizontal, 16).padding(.top, 10).padding(.bottom, 18)
+      }
+      .background(Look.black.ignoresSafeArea())
+      .foregroundStyle(Look.cream)
+      .toolbar(.hidden, for: .navigationBar)
     }
   }
 }
@@ -380,23 +486,23 @@ struct NativeImage: View {
       switch phase {
       case .success(let image): image.resizable().scaledToFill()
       default:
-        ZStack {
-          Look.card.ignoresSafeArea()
-          LastCallAvatar().padding(22)
-        }
+        ZStack { Look.card.ignoresSafeArea(); LastCallAvatar().padding(22) }
       }
     }.clipped()
   }
 }
+
 struct PrimaryButton: ButtonStyle {
   func makeBody(configuration: Configuration) -> some View {
-    configuration.label.font(.system(size: 8, weight: .bold)).tracking(1).foregroundStyle(
-      Look.black
-    ).padding(.horizontal, 13).padding(.vertical, 9).background(Look.gold).clipShape(
-      RoundedRectangle(cornerRadius: 7)
-    ).opacity(configuration.isPressed ? 0.75 : 1)
+    configuration.label
+      .font(.system(size: 14, weight: .bold))
+      .foregroundStyle(Look.black)
+      .background(Look.gold)
+      .clipShape(RoundedRectangle(cornerRadius: 12))
+      .opacity(configuration.isPressed ? 0.75 : 1)
   }
 }
+
 struct OutlineButton: ButtonStyle {
   func makeBody(configuration: Configuration) -> some View {
     configuration.label.font(.system(size: 7, weight: .bold)).tracking(0.8).foregroundStyle(
@@ -407,6 +513,7 @@ struct OutlineButton: ButtonStyle {
       configuration.isPressed ? 0.7 : 1)
   }
 }
+
 struct LCField: TextFieldStyle {
   func _body(configuration: TextField<Self._Label>) -> some View {
     configuration.padding(11).background(Look.card).foregroundStyle(Look.cream).clipShape(
@@ -414,6 +521,7 @@ struct LCField: TextFieldStyle {
     ).overlay(RoundedRectangle(cornerRadius: 8).stroke(Look.line))
   }
 }
+
 struct Look {
   static let black = Color(red: 0.03, green: 0.03, blue: 0.025)
   static let card = Color(red: 0.08, green: 0.075, blue: 0.065)
