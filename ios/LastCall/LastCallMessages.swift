@@ -38,7 +38,9 @@ struct LastCallMessages: View {
               Image(systemName: "square.and.pencil")
             }.foregroundStyle(Look.gold)
           }
-        }.task { await load() }.refreshable { await load() }.sheet(item: $selected) {
+        }.task { await load() }.refreshable { await load() }.sheet(item: $selected, onDismiss: {
+          Task { await load() }
+        }) {
           ConversationRouter(conversation: $0)
         }.sheet(isPresented: $showCommunity) { NativeCommunity() }
     }
