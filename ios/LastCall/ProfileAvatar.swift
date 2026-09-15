@@ -41,8 +41,7 @@ struct LastCallProfilePhotoPicker: View {
             let jpeg = UIImage(data: data)?.jpegData(compressionQuality: 0.84) else {
         throw LastCallAPIError.server("That photo could not be prepared.")
       }
-      _ = try await LastCallAPI.shared.uploadProfileAvatar(
-        jpeg: jpeg, userID: userID, accessToken: token)
+      _ = try await LastCallAPI.shared.uploadProfileAvatar(jpeg: jpeg, userID: userID, accessToken: token)
       await model.refreshAccount()
     } catch {
       await MainActor.run {
@@ -50,4 +49,11 @@ struct LastCallProfilePhotoPicker: View {
       }
     }
   }
+}
+
+// ProfileRow currently exposes privacy and identity fields but not a location.
+// Keep this compatibility value available to the visual profile without making
+// location data mandatory in the database response.
+extension ProfileRow {
+  var location: String? { nil }
 }
