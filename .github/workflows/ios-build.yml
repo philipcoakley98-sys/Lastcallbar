@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -19,9 +19,28 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
       - name: Show Xcode version
         run: xcodebuild -version
+
+      - name: Generate LAST CALL iOS app icons
+        run: bash scripts/generate-ios-icons.sh
+
+      - name: Commit generated app icon sizes
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ios/LastCall/Assets.xcassets/AppIcon.appiconset/*.png
+          if git diff --cached --quiet; then
+            echo "No generated icon changes to commit."
+          else
+            git commit -m "Generate LAST CALL iOS app icon sizes"
+            git push
+          fi
+
       - name: Build LAST CALL Debug for iPhone Simulator
         run: xcodebuild -project ios/LastCall.xcodeproj -scheme LastCall -sdk iphonesimulator -configuration Debug -derivedDataPath build/DebugDerivedData CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
+
       - name: Build LAST CALL Release for iPhone Simulator
         run: xcodebuild -project ios/LastCall.xcodeproj -scheme LastCall -sdk iphonesimulator -configuration Release -derivedDataPath build/ReleaseDerivedData CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
