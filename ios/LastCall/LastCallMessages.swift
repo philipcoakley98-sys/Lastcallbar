@@ -148,6 +148,11 @@ struct NativeChat: View {
     do {
       messages = try await LastCallAPI.shared.fetchMessages(
         conversationID: conversation.id, accessToken: token)
+      if let userID = model.user?.id {
+        for message in messages where message.senderId != userID {
+          try? await LastCallAPI.shared.markMessageRead(messageID: message.id, accessToken: token)
+        }
+      }
     } catch { model.error = "This conversation could not be loaded." }
     loading = false
   }
