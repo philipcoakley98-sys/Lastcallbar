@@ -56,10 +56,10 @@ struct LockedHome: View {
         showRecovery = true
       }
       .sheet(isPresented: $showRecovery) {
-        if let token = recoveryToken {
-          LastCallPasswordRecovery(accessToken: token) {
+        if let accessToken = recoveryToken {
+          LastCallPasswordRecovery(accessToken: accessToken) {
             showRecovery = false
-            recoveryToken = nil
+            self.recoveryToken = nil
             model.authMode = .signIn
             model.showAuth = true
           }
