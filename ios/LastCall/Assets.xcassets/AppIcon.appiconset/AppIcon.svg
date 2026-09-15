@@ -1,37 +1,19 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
 <defs>
  <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F7D889"/><stop offset="0.5" stop-color="#D6A83F"/><stop offset="1" stop-color="#F3D27B"/></linearGradient>
- <filter id="glow"><feGaussianBlur stdDeviation="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
 </defs>
-<rect width="1024" height="1024" fill="#080806"/>
-<rect x="72" y="72" width="880" height="880" rx="205" fill="#0B0A08" stroke="url(#gold)" stroke-width="10"/>
-<!-- small avatar -->
-<g transform="translate(160 150) scale(.48)" stroke="#080806" stroke-width="10" stroke-linejoin="round" stroke-linecap="round">
- <circle cx="145" cy="105" r="62" fill="#C9783D"/>
- <path d="M83 101c2-55 34-91 72-91 45 0 72 37 73 88-20-19-38-24-59-20-25 5-49 20-86 23z" fill="#6B351C"/>
- <circle cx="121" cy="111" r="7" fill="#080806" stroke="none"/><circle cx="169" cy="111" r="7" fill="#080806" stroke="none"/>
- <path d="M126 143c13 11 28 11 41 0" fill="none"/>
- <path d="M91 176l-27 43 35 20 25-37M197 176l28 43-34 20-25-37" fill="#111111"/>
- <path d="M99 174c27 22 65 23 91 0l37 116H62z" fill="#151515"/>
- <path d="M104 290l-27 119 49 0 21-119M185 290l21 119 49 0-29-119" fill="#4A79A5"/>
- <path d="M77 407h52l-6 42H61zM206 407h49l15 42h-61z" fill="#F3EBDD"/>
- <path d="M213 196l30-66 42 12-35 78z" fill="#151515"/>
- <path d="M245 113h42v67h-42z" fill="#24170D"/>
- <path d="M245 113h42v17h-42z" fill="#F3EBDD" stroke="none"/>
- <path d="M250 129h32v43h-32z" fill="#16120E" stroke="none"/>
+<rect width="1024" height="1024" rx="210" fill="#080806"/>
+<rect x="72" y="72" width="880" height="880" rx="205" fill="#0B0A08"/>
+<!-- clinking pints -->
+<g fill="none" stroke="url(#gold)" stroke-width="24" stroke-linejoin="round" stroke-linecap="round">
+ <path d="M350 365h145l-22 302c-5 67-44 104-92 104s-87-37-92-104z" transform="rotate(-14 350 365)"/>
+ <path d="M674 365H529l22 302c5 67 44 104 92 104s87-37 92-104z" transform="rotate(14 674 365)"/>
 </g>
-<!-- crossed pints -->
-<g fill="none" stroke="url(#gold)" stroke-width="27" stroke-linejoin="round" stroke-linecap="round" filter="url(#glow)">
- <path d="M355 402h142l-19 260c-5 63-43 98-88 98s-83-35-88-98z"/>
- <path d="M669 402H527l19 260c5 63 43 98 88 98s83-35 88-98z"/>
-</g>
-<path d="M362 454h128l-8 51H366zM662 454H534l8 51h124z" fill="#F3EBDD"/>
-<path d="M366 505h124M658 505H534" stroke="#D6A83F" stroke-width="12"/>
-<path d="M382 542l-14 153M642 542l14 153" stroke="#F3D27B" stroke-width="10" stroke-linecap="round"/>
-<path d="M465 376l-22-37M512 360v-48M559 376l22-37" stroke="#F3D27B" stroke-width="13" stroke-linecap="round"/>
-<!-- wordmark -->
-<g fill="url(#gold)" font-family="Georgia, 'Times New Roman', serif" font-weight="700" text-anchor="middle">
- <text x="512" y="850" font-size="72" letter-spacing="7">LAST CALL</text>
-</g>
-<path d="M188 830h72M764 830h72" stroke="#D6A83F" stroke-width="7" stroke-linecap="round"/>
+<!-- creamy heads -->
+<path d="M330 405h142l-7 50H337z" fill="#F3EBDD" transform="rotate(-14 330 405)"/>
+<path d="M694 405H552l7 50h135z" fill="#F3EBDD" transform="rotate(14 694 405)"/>
+<!-- clink rays -->
+<path d="M463 332l-22-36M512 315v-48M561 332l22-36" stroke="#F3D27B" stroke-width="13" stroke-linecap="round"/>
+<!-- small wordmark -->
+<text x="512" y="850" text-anchor="middle" fill="url(#gold)" font-family="Georgia, 'Times New Roman', serif" font-size="70" font-weight="700" letter-spacing="8">LAST CALL</text>
 </svg>
