@@ -1,0 +1,44 @@
+name: Repair profile build
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Repair Swift API calls
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('ios/LastCall/NativeCompatibilityViews.swift')
+          s = p.read_text()
+          s = s.replace('comments = try await LastCallAPI.shared.fetchStoryComments(storyID: story.id, accessToken: token)', 'comments = try await LastCallAPI.shared.fetchComments(storyID: story.id, accessToken: token)')
+          s = s.replace('authors = try await LastCallAPI.shared.fetchProfiles(userIDs: ids, accessToken: token)', 'let profiles = try await LastCallAPI.shared.fetchProfiles(ids: ids, accessToken: token)\n        authors = Dictionary(uniqueKeysWithValues: profiles.map { ($0.id, $0) })')
+          s = s.replace('try await LastCallAPI.shared.createStoryComment(storyID: story.id, body: value, accessToken: token)', 'try await LastCallAPI.shared.addComment(storyID: story.id, userID: model.user!.id, body: value, accessToken: token)')
+          s = s.replace('model.startConversation(with: person)\n            dismiss()', 'Task {\n              guard let token = model.token else { return }\n              do {\n                _ = try await LastCallAPI.shared.startConversation(targetID: person.id, accessToken: token)\n                dismiss()\n              } catch {\n                model.error = "Could not start this conversation just now."\n              }\n            }')
+          s = s.replace('people = (try? await LastCallAPI.shared.fetchCommunityProfiles(excluding: userID, accessToken: token)) ?? []', 'people = (try? await LastCallAPI.shared.fetchProfiles(excluding: userID, accessToken: token)) ?? []')
+          p.write_text(s)
+          p = Path('ios/LastCall/NativeApp.swift')
+          s = p.read_text()
+          if 'func startConversation(with person: ProfileRow)' not in s:
+            marker = '  func signOut() {'
+            method = '''  func startConversation(with person: ProfileRow) {\n    guard let token else { return }\n    Task {\n      do {\n        _ = try await LastCallAPI.shared.startConversation(targetID: person.id, accessToken: token)\n        tab = .messages\n        refreshID = UUID()\n      } catch {\n        error = "Could not start this conversation just now."\n      }\n    }\n  }\n\n'''
+            s = s.replace(marker, method + marker, 1)
+            p.write_text(s)
+          PY
+      - name: Build Debug and Release
+        run: |
+          xcodebuild -project ios/LastCall.xcodeproj -scheme LastCall -sdk iphonesimulator -configuration Debug CODE_SIGNING_ALLOWED=NO build
+          xcodebuild -project ios/LastCall.xcodeproj -scheme LastCall -sdk iphonesimulator -configuration Release CODE_SIGNING_ALLOWED=NO build
+      - name: Commit repair
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ios/LastCall/NativeCompatibilityViews.swift ios/LastCall/NativeApp.swift
+          git diff --cached --quiet || git commit -m "Fix profile integration API calls"
+          git push
+          git rm .github/workflows/repair-profile-build.yml
+          git commit -m "Remove temporary repair workflow"
+          git push
