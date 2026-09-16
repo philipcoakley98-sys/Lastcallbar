@@ -102,10 +102,11 @@ struct NativeStoryDetail: View {
   private func loadComments() async {
     guard let token = model.token else { loadingComments = false; return }
     do {
-      comments = try await LastCallAPI.shared.fetchStoryComments(storyID: story.id, accessToken: token)
+      comments = try await LastCallAPI.shared.fetchComments(storyID: story.id, accessToken: token)
       let ids = Array(Set(comments.map(\.userId)))
       if !ids.isEmpty {
-        authors = try await LastCallAPI.shared.fetchProfiles(userIDs: ids, accessToken: token)
+        let profiles = try await LastCallAPI.shared.fetchProfiles(ids: ids, accessToken: token)
+        authors = Dictionary(uniqueKeysWithValues: profiles.map { ($0.id, $0) })
       }
     } catch {
       model.error = "Comments could not be loaded just now."
@@ -119,7 +120,7 @@ struct NativeStoryDetail: View {
     sending = true
     Task {
       do {
-        try await LastCallAPI.shared.createStoryComment(storyID: story.id, body: value, accessToken: token)
+        try await LastCallAPI.shared.addComment(storyID: story.id, userID: model.user!.id, body: value, accessToken: token)
         draft = ""
         await loadComments()
       } catch {
@@ -140,8 +141,15 @@ struct NativeCommunity: View {
       List {
         ForEach(people) { person in
           Button {
-            model.startConversation(with: person)
-            dismiss()
+            Task {
+              guard let token = model.token else { return }
+              do {
+                _ = try await LastCallAPI.shared.startConversation(targetID: person.id, accessToken: token)
+                dismiss()
+              } catch {
+                model.error = "Could not start this conversation just now."
+              }
+            }
           } label: {
             HStack(spacing: 10) {
               ProfileAvatar(profile: person, size: 40)
@@ -159,7 +167,7 @@ struct NativeCommunity: View {
       .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
       .task {
         if let token = model.token, let userID = model.user?.id {
-          people = (try? await LastCallAPI.shared.fetchCommunityProfiles(excluding: userID, accessToken: token)) ?? []
+          people = (try? await LastCallAPI.shared.fetchProfiles(excluding: userID, accessToken: token)) ?? []
         }
       }
     }

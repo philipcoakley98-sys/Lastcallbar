@@ -120,6 +120,19 @@ final class NativeAppModel: ObservableObject {
     }
   }
 
+  func startConversation(with person: ProfileRow) {
+    guard let token else { return }
+    Task {
+      do {
+        _ = try await LastCallAPI.shared.startConversation(targetID: person.id, accessToken: token)
+        tab = .messages
+        refreshID = UUID()
+      } catch {
+        self.error = "Could not start this conversation just now."
+      }
+    }
+  }
+
   func signOut() {
     LastCallAPI.shared.signOut()
     token = nil
