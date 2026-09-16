@@ -1,6 +1,7 @@
 name: Repair profile build
 on:
-  workflow_dispatch:
+  push:
+    branches: [main]
 permissions:
   contents: write
 jobs:
@@ -32,7 +33,7 @@ jobs:
         run: |
           xcodebuild -project ios/LastCall.xcodeproj -scheme LastCall -sdk iphonesimulator -configuration Debug CODE_SIGNING_ALLOWED=NO build
           xcodebuild -project ios/LastCall.xcodeproj -scheme LastCall -sdk iphonesimulator -configuration Release CODE_SIGNING_ALLOWED=NO build
-      - name: Commit repair
+      - name: Commit repair and remove workflow
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
