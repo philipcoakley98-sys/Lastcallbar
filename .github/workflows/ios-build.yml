@@ -41,6 +41,7 @@ jobs:
             git push
           fi
 
+      # Release gate: both configurations must compile cleanly.
       - name: Build LAST CALL Debug for iPhone Simulator
         run: xcodebuild -project ios/LastCall.xcodeproj -scheme LastCall -sdk iphonesimulator -configuration Debug -derivedDataPath build/DebugDerivedData CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
 
