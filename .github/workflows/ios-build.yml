@@ -37,13 +37,24 @@ jobs:
           if git diff --cached --quiet; then
             echo "No generated icon changes to commit."
           else
-            git commit -m "Generate LAST CALL iOS app icon sizes"
+            git commit -m "Generate LAST CALL app icon sizes"
             git push
           fi
 
-      # Release gate: both configurations must compile cleanly.
       - name: Build LAST CALL Debug for iPhone Simulator
         run: xcodebuild -project ios/LastCall.xcodeproj -scheme LastCall -sdk iphonesimulator -configuration Debug -derivedDataPath build/DebugDerivedData CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
 
       - name: Build LAST CALL Release for iPhone Simulator
         run: xcodebuild -project ios/LastCall.xcodeproj -scheme LastCall -sdk iphonesimulator -configuration Release -derivedDataPath build/ReleaseDerivedData CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
+
+      - name: Package simulator app
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent build/ReleaseDerivedData/Build/Products/Release-iphonesimulator/LastCall.app build/LastCall-Simulator.zip
+
+      - name: Upload simulator build
+        uses: actions/upload-artifact@v4
+        with:
+          name: LastCall-iOS-Simulator
+          path: build/LastCall-Simulator.zip
+          if-no-files-found: error
+          retention-days: 7
