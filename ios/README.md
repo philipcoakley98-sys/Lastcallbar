@@ -9,7 +9,7 @@ The build follows the approved starter mockup:
 - dark Irish-pub editorial look
 - cream typography with gold accents and deep green actions
 - compact iPhone-first layout
-- five-tab navigation: Home, Stories, Write, Messages, Profile
+- five-tab navigation: Home, Explore, Write, Messages, Profile
 - Community / People is opened as an in-app sheet rather than a sixth root tab
 - Story of the Night feature
 - story detail, reactions, categories, community and messaging surfaces
@@ -37,17 +37,18 @@ The native app connects to the existing LAST CALL Supabase project using the pub
 ## Release readiness
 
 - Marketing version: **1.0.0**
-- Build number: **1**
+- Build number: **9**
 - Privacy manifest: `PrivacyInfo.xcprivacy`
-- Deployment target: **iOS 17**
+- Deployment target: **iOS 26.0**
 - Bundle identifier: `com.lastcall.app`
 - GitHub Actions macOS simulator build check: `.github/workflows/ios-build.yml`
+- GitHub Actions unsigned device archive: `.github/workflows/ios-device-archive.yml`
 
 ## Project
 
 Open `LastCall.xcodeproj` in Xcode and run the **LastCall** target on an iPhone simulator or device.
 
-The repository work is being completed independently of Xcode. The GitHub Actions workflow is configured to build an unsigned iPhone Simulator app on macOS. Final device compilation, signing and TestFlight upload still require Xcode on macOS and an active Apple Developer Program membership.
+The repository work is being completed independently of Xcode. GitHub Actions builds the unsigned iPhone Simulator app and unsigned iPhone device archive on macOS. Final device signing/export and TestFlight upload require Xcode on macOS and an active Apple Developer Program membership.
 
 For external TestFlight distribution, the first build must go through TestFlight App Review; after approval, testers can be invited by email or public link.
 
