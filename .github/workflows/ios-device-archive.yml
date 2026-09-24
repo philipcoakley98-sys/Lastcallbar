@@ -1,0 +1,39 @@
+name: iOS device archive
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  archive:
+    runs-on: macos-26
+    timeout-minutes: 25
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Select modern Xcode
+        run: |
+          sudo xcode-select -s /Applications/Xcode_26.6.app/Contents/Developer
+          xcodebuild -version
+
+      - name: Generate LAST CALL app icons
+        run: bash scripts/generate-ios-icons.sh
+
+      - name: Create unsigned device archive
+        run: |
+          xcodebuild             -project ios/LastCall.xcodeproj             -scheme LastCall             -configuration Release             -sdk iphoneos             -archivePath build/LastCall.xcarchive             CODE_SIGNING_ALLOWED=NO             CODE_SIGNING_REQUIRED=NO             archive
+
+      - name: Package archive
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent build/LastCall.xcarchive build/LastCall-Unsigned.xcarchive.zip
+
+      - name: Upload device archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: LastCall-iOS-Unsigned-Archive
+          path: build/LastCall-Unsigned.xcarchive.zip
+          if-no-files-found: error
+          retention-days: 7
